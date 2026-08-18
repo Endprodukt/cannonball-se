@@ -838,8 +838,11 @@ void OOutputs::do_motor_crash()
 // Source: 0xE9BE
 void OOutputs::do_motor_offroad()
 {
+    // For FFB, keep the denser vibration pattern even when all wheels
+    // are off-road. Cabinet/non-FFB modes retain the original table choice.
     const uint8_t* table =
-        (oferrari.wheel_state != OFerrari::WHEELS_OFF)
+        (mode == MODE_FFEEDBACK ||
+         oferrari.wheel_state != OFerrari::WHEELS_OFF)
         ? MOTOR_VALUES_OFFROAD2
         : MOTOR_VALUES_OFFROAD1;
 
@@ -907,9 +910,9 @@ void OOutputs::do_motor_offroad()
             static_cast<int>(cmd) - MOTOR_CENTRE;
     }
 
-    // Reduce existing off-road vibration to 35%.
+    // Reduce existing off-road vibration to 50%.
     rumble_force =
-        (rumble_force * 35) / 100;
+        (rumble_force * 50) / 100;
 
     // Constant outward pull.
     //
@@ -1147,24 +1150,24 @@ void OOutputs::do_vibrate_mini()
 void OOutputs::coin_chute_out(CoinChute* chute, bool insert)
 {
     // Initalize counter if coin inserted
-    chute->counter[2] = insert ? 1 : 0;
+    chute1.counter[2] = insert ? 1 : 0;
 
-    if (chute->counter[0])
+    if (chute1.counter[0])
     {
-        if (--chute->counter[0] != 0)
+        if (--chute1.counter[0] != 0)
             return;
-        chute->counter[1] = 6;
-        clear_digital(chute->output_bit);
+        chute1.counter[1] = 6;
+        clear_digital(chute1.output_bit);
     }
-    else if (chute->counter[1])
+    else if (chute1.counter[1])
     {
-        chute->counter[1]--;
+        chute1.counter[1]--;
     }
     // Coin first inserted. Called Once. 
-    else if (chute->counter[2])
+    else if (chute1.counter[2])
     {
-        chute->counter[2]--;
-        chute->counter[0] = 6;
-        set_digital(chute->output_bit);
+        chute1.counter[2]--;
+        chute1.counter[0] = 6;
+        set_digital(chute1.output_bit);
     }
 }

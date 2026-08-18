@@ -1,4 +1,4 @@
-name: Temporary offroad rumble patch
+name: Temporary offroad rumble cleanup
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  patch:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +17,7 @@ jobs:
           ref: test-offroad-rumble-continuous
           fetch-depth: 0
 
-      - name: Apply exact offroad FFB patch
+      - name: Restore unintended coin chute changes
         shell: bash
         run: |
           python3 - <<'PY'
@@ -26,51 +26,76 @@ jobs:
           path = Path('src/main/engine/ooutputs.cpp')
           text = path.read_text(encoding='utf-8')
 
-          old_table = '''    const uint8_t* table =
-              (oferrari.wheel_state != OFerrari::WHEELS_OFF)
-              ? MOTOR_VALUES_OFFROAD2
-              : MOTOR_VALUES_OFFROAD1;
-          '''
-          old_table = old_table.replace('              (', '        (').replace('              ?', '        ?').replace('              :', '        :')
+          bad = '''void OOutputs::coin_chute_out(CoinChute* chute, bool insert)
+          {
+              // Initalize counter if coin inserted
+              chute1.counter[2] = insert ? 1 : 0;
 
-          new_table = '''    // For FFB, keep the denser vibration pattern even when all wheels
-              // are off-road. Cabinet/non-FFB modes retain the original table choice.
-              const uint8_t* table =
-                  (mode == MODE_FFEEDBACK ||
-                   oferrari.wheel_state != OFerrari::WHEELS_OFF)
-                  ? MOTOR_VALUES_OFFROAD2
-                  : MOTOR_VALUES_OFFROAD1;
-          '''
-          new_table = new_table.replace('              // are', '    // are').replace('              const', '    const').replace('                  (', '        (').replace('                   oferrari', '         oferrari').replace('                  ?', '        ?').replace('                  :', '        :')
+              if (chute1.counter[0])
+              {
+                  if (--chute1.counter[0] != 0)
+                      return;
+                  chute1.counter[1] = 6;
+                  clear_digital(chute1.output_bit);
+              }
+              else if (chute1.counter[1])
+              {
+                  chute1.counter[1]--;
+              }
+              // Coin first inserted. Called Once. 
+              else if (chute1.counter[2])
+              {
+                  chute1.counter[2]--;
+                  chute1.counter[0] = 6;
+                  set_digital(chute1.output_bit);
+              }
+          }'''
+          bad = bad.replace('          {', '{').replace('              // Initalize', '    // Initalize').replace('              chute1', '    chute1').replace('              if', '    if').replace('              {', '    {').replace('                  if', '        if').replace('                      return', '            return').replace('                  chute1', '        chute1').replace('                  clear', '        clear').replace('              }', '    }').replace('              else', '    else').replace('                  set', '        set')
 
-          old_strength = '''    // Reduce existing off-road vibration to 35%.
-              rumble_force =
-                  (rumble_force * 35) / 100;
-          '''
-          old_strength = old_strength.replace('              rumble_force', '    rumble_force').replace('                  (rumble', '        (rumble')
+          good = '''void OOutputs::coin_chute_out(CoinChute* chute, bool insert)
+          {
+              // Initalize counter if coin inserted
+              chute->counter[2] = insert ? 1 : 0;
 
-          new_strength = '''    // Reduce existing off-road vibration to 50%.
-              rumble_force =
-                  (rumble_force * 50) / 100;
-          '''
-          new_strength = new_strength.replace('              rumble_force', '    rumble_force').replace('                  (rumble', '        (rumble')
+              if (chute->counter[0])
+              {
+                  if (--chute->counter[0] != 0)
+                      return;
+                  chute->counter[1] = 6;
+                  clear_digital(chute->output_bit);
+              }
+              else if (chute->counter[1])
+              {
+                  chute->counter[1]--;
+              }
+              // Coin first inserted. Called Once. 
+              else if (chute->counter[2])
+              {
+                  chute->counter[2]--;
+                  chute->counter[0] = 6;
+                  set_digital(chute->output_bit);
+              }
+          }'''
+          good = good.replace('          {', '{').replace('              // Initalize', '    // Initalize').replace('              chute->', '    chute->').replace('              if', '    if').replace('              {', '    {').replace('                  if', '        if').replace('                      return', '            return').replace('                  chute->', '        chute->').replace('                  clear', '        clear').replace('              }', '    }').replace('              else', '    else').replace('                  set', '        set')
 
-          if text.count(old_table) != 1:
-              raise SystemExit(f'Expected table block once, found {text.count(old_table)}')
-          if text.count(old_strength) != 1:
-              raise SystemExit(f'Expected strength block once, found {text.count(old_strength)}')
+          if text.count(bad) != 1:
+              raise SystemExit(f'Expected bad coin block once, found {text.count(bad)}')
 
-          text = text.replace(old_table, new_table)
-          text = text.replace(old_strength, new_strength)
+          if '(rumble_force * 50) / 100;' not in text:
+              raise SystemExit('50 percent rumble change missing')
+          if 'mode == MODE_FFEEDBACK ||' not in text:
+              raise SystemExit('continuous FFB table selection change missing')
+
+          text = text.replace(bad, good)
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: Commit patched source and remove temporary workflow
+      - name: Commit cleanup and remove temporary workflow
         shell: bash
         run: |
           rm .github/workflows/temp-offroad-rumble.yml
           git config user.name "Endprodukt"
           git config user.email "o.carell@kabelmail.de"
           git add src/main/engine/ooutputs.cpp .github/workflows/temp-offroad-rumble.yml
-          git commit -m "Keep off-road rumble active and set it to 50 percent"
+          git commit -m "Clean up off-road rumble test patch"
           git push origin HEAD:test-offroad-rumble-continuous

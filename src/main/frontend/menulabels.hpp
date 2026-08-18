@@ -116,6 +116,8 @@ const static char* ENTRY_DPEDAL             = "DIGITAL PEDAL SPEED ";
 
 // GamePad Menu
 const static char* ENTRY_ANALOG             = "ANALOG ";
+const static char* ENTRY_INVERT_ACCEL       = "INVERT GAS ";
+const static char* ENTRY_INVERT_BRAKE       = "INVERT BRAKE ";
 const static char* ENTRY_FFB = "FORCE FEEDBACK ";
 const static char* ENTRY_FFB_STRENGTH = "FFB STRENGTH ";
 const static char* ENTRY_CENTERING_STRENGTH = "CENTERING STRENGTH ";

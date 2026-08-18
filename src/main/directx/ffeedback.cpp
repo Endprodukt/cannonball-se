@@ -338,14 +338,6 @@ namespace forcefeedback
                 << std::dec
                 << std::endl;
         }
-        else
-        {
-            std::cout
-                << "DirectInput: centering strength = "
-                << g_centering_percent
-                << "%"
-                << std::endl;
-        }
     }
 
     static SDL_Window* g_ffb_window = nullptr;
@@ -472,11 +464,6 @@ namespace forcefeedback
 
         // Device accepted.
         g_pDevice = device;
-
-
-        std::cout
-            << "DirectInput: FFB device selected"
-            << std::endl;
 
 
         return DIENUM_STOP;
@@ -703,16 +690,15 @@ namespace forcefeedback
                 nullptr);
 
 
-        std::cout
-            << "DirectInput: Create spring result = 0x"
-            << std::hex
-            << (unsigned long)hr
-            << std::dec
-            << std::endl;
-
-
         if (FAILED(hr))
         {
+            std::cout
+                << "DirectInput: Create spring failed: 0x"
+                << std::hex
+                << (unsigned long)hr
+                << std::dec
+                << std::endl;
+
             g_pSpringEffect = nullptr;
             return false;
         }
@@ -724,14 +710,6 @@ namespace forcefeedback
                 0);
 
 
-        std::cout
-            << "DirectInput: Start spring result = 0x"
-            << std::hex
-            << (unsigned long)hr
-            << std::dec
-            << std::endl;
-
-
         if (hr == DIERR_INPUTLOST ||
             hr == DIERR_NOTACQUIRED ||
             hr == DIERR_NOTEXCLUSIVEACQUIRED)
@@ -741,42 +719,31 @@ namespace forcefeedback
             HRESULT acquire_hr =
                 g_pDevice->Acquire();
 
-            std::cout
-                << "DirectInput: spring Acquire result = 0x"
-                << std::hex
-                << (unsigned long)acquire_hr
-                << std::dec
-                << std::endl;
-
             if (SUCCEEDED(acquire_hr))
             {
                 hr =
                     g_pSpringEffect->Start(
                         1,
                         0);
-
-                std::cout
-                    << "DirectInput: spring retry result = 0x"
-                    << std::hex
-                    << (unsigned long)hr
-                    << std::dec
-                    << std::endl;
             }
         }
 
 
         if (FAILED(hr))
         {
+            std::cout
+                << "DirectInput: unable to start centering spring: 0x"
+                << std::hex
+                << (unsigned long)hr
+                << std::dec
+                << std::endl;
+
             g_pSpringEffect->Release();
             g_pSpringEffect = nullptr;
 
             return false;
         }
 
-
-        std::cout
-            << "DirectInput: native centering spring enabled at 30%"
-            << std::endl;
 
         return true;
     }
@@ -880,25 +847,6 @@ namespace forcefeedback
                 << std::endl;
 
             return false;
-        }
-
-
-        const char* target =
-            std::getenv("FF_TARGET_VIDPID");
-
-
-        if (target)
-        {
-            std::cout
-                << "DirectInput: target VID/PID = "
-                << target
-                << std::endl;
-        }
-        else
-        {
-            std::cout
-                << "DirectInput: no VID/PID filter set"
-                << std::endl;
         }
 
 
@@ -1054,12 +1002,6 @@ namespace forcefeedback
         }
 
 
-        std::cout
-            << "DirectInput: FFB actuator axes = "
-            << g_num_ff_axes
-            << std::endl;
-
-
         if (g_num_ff_axes == 0)
         {
             std::cout
@@ -1121,11 +1063,6 @@ namespace forcefeedback
         g_supported = true;
 
 
-        std::cout
-            << "DirectInput force feedback enabled"
-            << std::endl;
-
-
         return true;
 }
     // -----------------------------------------------------------------------------
@@ -1149,20 +1086,6 @@ namespace forcefeedback
             force < 0)
         {
             return -1;
-        }
-
-        static int debug_count = 0;
-
-        if (debug_count < 30)
-        {
-            std::cout
-                << "FFB SET: direction="
-                << xdirection
-                << " force="
-                << force
-                << std::endl;
-
-            debug_count++;
         }
 
         LONG direction[2] =
@@ -1235,19 +1158,6 @@ namespace forcefeedback
                 DIEP_TYPESPECIFICPARAMS |
                 DIEP_START);
 
-        static int result_debug_count = 0;
-
-        if (result_debug_count < 30)
-        {
-            std::cout
-                << "FFB RESULT: 0x"
-                << std::hex
-                << (unsigned long)hr
-                << std::dec
-                << std::endl;
-
-            result_debug_count++;
-        }
         // Device temporarily lost or no longer exclusively acquired?
         if (hr == DIERR_INPUTLOST ||
             hr == DIERR_NOTACQUIRED ||
@@ -1259,13 +1169,6 @@ namespace forcefeedback
             HRESULT acquire_hr =
                 g_pDevice->Acquire();
 
-            std::cout
-                << "FFB REACQUIRE: 0x"
-                << std::hex
-                << (unsigned long)acquire_hr
-                << std::dec
-                << std::endl;
-
             if (SUCCEEDED(acquire_hr))
             {
                 hr =
@@ -1274,11 +1177,13 @@ namespace forcefeedback
                         DIEP_DIRECTION |
                         DIEP_TYPESPECIFICPARAMS |
                         DIEP_START);
-
+            }
+            else
+            {
                 std::cout
-                    << "FFB RETRY RESULT: 0x"
+                    << "DirectInput: FFB reacquire failed: 0x"
                     << std::hex
-                    << (unsigned long)hr
+                    << (unsigned long)acquire_hr
                     << std::dec
                     << std::endl;
             }

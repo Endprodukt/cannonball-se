@@ -357,9 +357,11 @@ void Config::load()
         controls.centering_strength = 0;
     else if (controls.centering_strength > 100)
         controls.centering_strength = 100;
-    controls.max_force     = cfg.get_int("controls.analog.haptic.max_force",            10000);
-    controls.min_force     = cfg.get_int("controls.analog.haptic.min_force",            8500);
-    controls.force_duration= cfg.get_int("controls.analog.haptic.force_duration",       1);
+
+    // Internal FFB tuning values. These are not user-facing configuration options.
+    controls.max_force      = 10000;
+    controls.min_force      = 8500;
+    controls.force_duration = 1;
 
     // ------------------------------------------------------------------------
     // Engine Settings
@@ -515,9 +517,6 @@ bool Config::save()
     cfg.put_int("controls.analog.haptic.<xmlattr>.enabled", controls.haptic);
     cfg.put_int("controls.analog.haptic.strength", controls.ffb_strength);
     cfg.put_int("controls.analog.haptic.centering_strength", controls.centering_strength);
-    cfg.put_int("controls.analog.haptic.max_force", controls.max_force);
-    cfg.put_int("controls.analog.haptic.min_force", controls.min_force);
-    cfg.put_int("controls.analog.haptic.force_duration", controls.force_duration);
 
 
     cfg.put_int("controls.hat.up.index", controls.hat[0]);

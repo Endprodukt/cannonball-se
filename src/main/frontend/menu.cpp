@@ -253,6 +253,8 @@ void Menu::populate_controls()
 
     menu_controls.push_back(ENTRY_GEAR);
     menu_controls.push_back(ENTRY_ANALOG);
+    menu_controls.push_back(ENTRY_INVERT_ACCEL);
+    menu_controls.push_back(ENTRY_INVERT_BRAKE);
 
     menu_controls.push_back(ENTRY_FFB);
     menu_controls.push_back(ENTRY_FFB_STRENGTH);
@@ -1096,6 +1098,14 @@ void Menu::tick_menu()
 
                 input.analog = config.controls.analog;
             }
+            else if (SELECTED(ENTRY_INVERT_ACCEL))
+            {
+                config.controls.invert[1] = !config.controls.invert[1];
+            }
+            else if (SELECTED(ENTRY_INVERT_BRAKE))
+            {
+                config.controls.invert[2] = !config.controls.invert[2];
+            }
             else if (SELECTED(ENTRY_FFB))
             {
                 config.controls.haptic ^= 1;
@@ -1567,6 +1577,16 @@ void Menu::refresh_menu()
                 set_menu_text(
                     ENTRY_ANALOG,
                     ANALOG_LABELS[config.controls.analog]);
+
+            else if (SELECTED(ENTRY_INVERT_ACCEL))
+                set_menu_text(
+                    ENTRY_INVERT_ACCEL,
+                    config.controls.invert[1] ? "ON" : "OFF");
+
+            else if (SELECTED(ENTRY_INVERT_BRAKE))
+                set_menu_text(
+                    ENTRY_INVERT_BRAKE,
+                    config.controls.invert[2] ? "ON" : "OFF");
 
             else if (SELECTED(ENTRY_FFB))
                 set_menu_text(

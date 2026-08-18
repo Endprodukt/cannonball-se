@@ -363,6 +363,11 @@ void Config::load()
     controls.min_force      = 8500;
     controls.force_duration = 1;
 
+    // Remove legacy FFB debug options from existing config files.
+    cfg.erase("controls.analog.haptic.max_force");
+    cfg.erase("controls.analog.haptic.min_force");
+    cfg.erase("controls.analog.haptic.force_duration");
+
     // ------------------------------------------------------------------------
     // Engine Settings
     // ------------------------------------------------------------------------

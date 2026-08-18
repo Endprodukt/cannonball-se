@@ -297,7 +297,6 @@ void OOutputs::diag_centre(int16_t input_motor, uint8_t hw_motor_limit)
         motor_state      = STATE_DONE;
     }
 }
-
 void OOutputs::diag_done()
 {
     if (counter > 0)
@@ -530,7 +529,7 @@ const static uint8_t MOTOR_VALUES_OFFROAD1[] =
 const static uint8_t MOTOR_VALUES_OFFROAD2[] = 
 {
     0x8, 0x5, 0x8, 0xB, 0x8, 0x5, 0x8, 0xB, 0x8, 0x4, 0x8, 0xC, 0x8, 0x4, 0x8, 0xC,
-    0x8, 0x3, 0x8, 0xD, 0x8, 0x3, 0x8, 0xD, 0x8, 0x2, 0x8, 0xE, 0x8, 0x2, 0x8, 0xE,
+    0x8, 0x3, 0x8, 0xD, 0x8, 0x3, 0x8, 0xD, 0x8, 0x2, 0x2, 0x8, 0xE, 0x8, 0x2, 0x8, 0xE,
 };
 
 const static uint8_t MOTOR_VALUES_OFFROAD3[] = 
@@ -556,8 +555,7 @@ void OOutputs::do_motors(int MODE, int16_t input_motor)
     if (!motor_enabled)
     {
         done();
-        return;
-    }
+        return;    }
 
     // In-Game: Test for crash, skidding, whether car is moving
     if (outrun.game_state == GS_INGAME)
@@ -907,9 +905,9 @@ void OOutputs::do_motor_offroad()
             static_cast<int>(cmd) - MOTOR_CENTRE;
     }
 
-    // Reduce existing off-road vibration to 55%.
+    // Reduce existing off-road vibration to 50%.
     rumble_force =
-        (rumble_force * 55) / 100;
+        (rumble_force * 50) / 100;
 
     // Constant outward pull.
     //
@@ -977,8 +975,7 @@ void OOutputs::done()
 // This is the equivalent to writing to register 0x140003
 void OOutputs::motor_output(uint8_t cmd)
 {
-    if (cmd == MOTOR_OFF || cmd == MOTOR_CENTRE)
-        return;
+    if (cmd == MOTOR_OFF || cmd == MOTOR_CENTRE)        return;
 
     int8_t force = 0;
 
@@ -997,8 +994,7 @@ void OOutputs::motor_output(uint8_t cmd)
 // Deluxe Upright: Vibration Enable Table. 4 Groups of vibration values.
 const static uint8_t VIBRATE_LOOKUP[] = 
 {
-    // SLOW SPEED --------   // MEDIUM SPEED ------
-    1, 0, 0, 0, 1, 0, 0, 0,  1, 1, 0, 0, 1, 1, 0, 0,
+    // SLOW SPEED --------   // MEDIUM SPEED ------    1, 0, 0, 0, 1, 0, 0, 0,  1, 1, 0, 0, 1, 1, 0, 0,
     // FAST SPEED --------   // VERY FAST SPEED ---
     1, 1, 1, 0, 1, 1, 1, 0,  1, 1, 1, 1, 1, 1, 1, 1,
 };

@@ -1,0 +1,66 @@
+name: Temporary menu layout patch
+
+on:
+  push:
+    branches:
+      - test-long-menu-position
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test-long-menu-position
+          fetch-depth: 0
+
+      - name: Apply exact menu positioning patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/main/frontend/menu.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''    // Find central column in screen.
+              int8_t y = 13 + ((ROWS - 13) >> 1) - (((int)menu_selected->size() * 2) >> 1);
+          '''
+
+          # The source uses four leading spaces; keep the replacement deliberately exact.
+          old = old.replace('              int8_t', '    int8_t')
+
+          new = '''    // Find central column in screen.
+              int y = 13 + ((ROWS - 13) >> 1) - (((int)menu_selected->size() * 2) >> 1);
+
+              // Keep long menus fully visible while preserving the existing spacing
+              // and positioning of menus that already fit on screen.
+              const int last_y = y + ((static_cast<int>(menu_selected->size()) - 1) * 2);
+              if (last_y >= ROWS)
+                  y -= last_y - (ROWS - 1);
+          '''
+          new = new.replace('              int y', '    int y')
+          new = new.replace('              // Keep', '    // Keep')
+          new = new.replace('              // and', '    // and')
+          new = new.replace('              const int', '    const int')
+          new = new.replace('              if', '    if')
+          new = new.replace('                  y', '        y')
+
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected source block exactly once, found {text.count(old)}')
+
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Commit patched source and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/temp-menu-layout.yml
+          git config user.name "Endprodukt"
+          git config user.email "o.carell@kabelmail.de"
+          git add src/main/frontend/menu.cpp .github/workflows/temp-menu-layout.yml
+          git commit -m "Adjust long menu positioning"
+          git push origin HEAD:test-long-menu-position

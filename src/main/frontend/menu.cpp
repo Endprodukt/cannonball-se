@@ -502,7 +502,13 @@ void Menu::draw_menu_options()
     int8_t x = 0;
 
     // Find central column in screen.
-    int8_t y = 13 + ((ROWS - 13) >> 1) - (((int)menu_selected->size() * 2) >> 1);
+    int y = 13 + ((ROWS - 13) >> 1) - (((int)menu_selected->size() * 2) >> 1);
+
+    // Keep long menus fully visible while preserving the existing spacing
+    // and positioning of menus that already fit on screen.
+    const int last_y = y + ((static_cast<int>(menu_selected->size()) - 1) * 2);
+    if (last_y >= ROWS)
+        y -= last_y - (ROWS - 1);
 
     for (int i = 0; i < (int) menu_selected->size(); i++)
     {

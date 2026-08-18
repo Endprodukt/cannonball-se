@@ -1150,24 +1150,24 @@ void OOutputs::do_vibrate_mini()
 void OOutputs::coin_chute_out(CoinChute* chute, bool insert)
 {
     // Initalize counter if coin inserted
-    chute1.counter[2] = insert ? 1 : 0;
+    chute->counter[2] = insert ? 1 : 0;
 
-    if (chute1.counter[0])
+    if (chute->counter[0])
     {
-        if (--chute1.counter[0] != 0)
+        if (--chute->counter[0] != 0)
             return;
-        chute1.counter[1] = 6;
-        clear_digital(chute1.output_bit);
+        chute->counter[1] = 6;
+        clear_digital(chute->output_bit);
     }
-    else if (chute1.counter[1])
+    else if (chute->counter[1])
     {
-        chute1.counter[1]--;
+        chute->counter[1]--;
     }
     // Coin first inserted. Called Once. 
-    else if (chute1.counter[2])
+    else if (chute->counter[2])
     {
-        chute1.counter[2]--;
-        chute1.counter[0] = 6;
-        set_digital(chute1.output_bit);
+        chute->counter[2]--;
+        chute->counter[0] = 6;
+        set_digital(chute->output_bit);
     }
 }

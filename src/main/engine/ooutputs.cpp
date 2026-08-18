@@ -907,20 +907,20 @@ void OOutputs::do_motor_offroad()
             static_cast<int>(cmd) - MOTOR_CENTRE;
     }
 
-    // Reduce existing off-road vibration to 50%.
+    // Reduce existing off-road vibration to 35%.
     rumble_force =
-        (rumble_force * 50) / 100;
+        (rumble_force * 35) / 100;
 
     // Constant outward pull.
     //
-    // One side off-road: roughly 35% maximum force.
-    // Completely off-road: roughly 50% maximum force.
+    // One side off-road: roughly 45% maximum force.
+    // Completely off-road: roughly 70% maximum force.
     int pull_force;
 
     if (oferrari.wheel_state == OFerrari::WHEELS_OFF)
-        pull_force = 4;
+        pull_force = 5;
     else
-        pull_force = 2;
+        pull_force = 3;
 
     pull_force *= offroad_pull_direction;
 

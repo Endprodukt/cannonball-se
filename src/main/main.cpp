@@ -211,7 +211,7 @@ static void set_music_detent_force(int direction, int gain_percent)
         scaled_gain = 100;
 
     forcefeedback::set_gain(scaled_gain);
-    forcefeedback::set(direction, 7);
+    forcefeedback::set(direction, 0);
     forcefeedback::set_gain(config.controls.ffb_strength);
 }
 
@@ -417,19 +417,21 @@ static void tick()
 
             // On this DirectInput path 0x07 physically pulls the current wheel
             // right and 0x09 left. First resist the player's movement, then
-            // briefly snap into the newly selected position.
+            // clearly snap into the newly selected position.
             const int resistance_direction =
                 ffb_music_detent_direction > 0 ? 0x09 : 0x07;
             const int snap_direction =
                 ffb_music_detent_direction > 0 ? 0x07 : 0x09;
 
-            if (elapsed < 55)
+            if (elapsed < 110)
             {
-                set_music_detent_force(resistance_direction, 70);
+                // Deliberately strong: prove the detent is physically present.
+                // At the default 50% master this runs at 65% effective gain.
+                set_music_detent_force(resistance_direction, 130);
             }
-            else if (elapsed < 85)
+            else if (elapsed < 170)
             {
-                set_music_detent_force(snap_direction, 45);
+                set_music_detent_force(snap_direction, 100);
             }
             else
             {
@@ -520,9 +522,9 @@ static void play_stats_and_watchdog_updater() {
     while (cannonball::state != STATE_QUIT) {
         if ((run_time.get_ticks() >= 60000) &&
             (cannonball::state == STATE_GAME) ) {
-            config.stats.runtime++;  // increment machine run-time counter by 1 (minute)
-            config.save_stats();     // save the stats to the file
-            run_time.start();        // reset the timer
+            config.stats.runtime++;  // increment machine run-time by 1 (minute)
+            config.save_stats();     // save stats file
+            run_time.start();        // reset timer
         }
         SDL_Delay(500); // wait 0.5 seconds before next check
 
@@ -770,7 +772,7 @@ static void main_loop() {
         } else if (!vsync) {
             if (now < nextFrameTime) {
                 auto sleepDuration = nextFrameTime - now;
-                // Only record sleep if we're at 30 FPS.
+                // Only record sleep if running at 30 FPS.
                 totalSleepTime += sleepDuration * (configured_fps == 30);
 
                 std::this_thread::sleep_for(sleepDuration);
@@ -781,7 +783,7 @@ static void main_loop() {
         // Update the next frame time.
         nextFrameTime += frameDuration;
 
-        // Record FPS info on console (every 2 seconds) and FPS on-screen if enabled
+        // Record FPS info on console (every 2 seconds)
         auto elapsed = std::chrono::steady_clock::now() - fpsTimer;
         if (elapsed >= std::chrono::seconds(2)) {
             int fps = renderedFrames / 2;

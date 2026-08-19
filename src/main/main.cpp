@@ -506,7 +506,7 @@ static void play_stats_and_watchdog_updater() {
         // Set the watchdog timeout (in seconds)
         int timeout = 15; // 15 seconds is the maximum supported on Raspberry Pi
         if (ioctl(g_watchdog_fd, WDIOC_SETTIMEOUT, &timeout) < 0) {
-            std::cerr << "Note: Unable to set " << SYSTEM_WATCHDOG << " timeout" << std::endl;
+            std::cerr << "Note: Unable to set watchdog timeout - proceeding without system watchdog." << std::endl;
             close(g_watchdog_fd);
             g_watchdog_fd = -1;
         } else {

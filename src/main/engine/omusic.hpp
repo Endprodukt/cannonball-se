@@ -28,6 +28,8 @@ public:
     void play_music(int index = -1);
     void cycle_music();
 
+    int get_music_selected() const { return static_cast<int>(music_selected); }
+
 private:
     // Modified Widescreen version of the Music Select Tilemap
     RomLoader* tilemap;

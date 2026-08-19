@@ -23,6 +23,7 @@
 #include "utils.hpp"
 
 #include "engine/outrun.hpp"
+#include "engine/oanimseq.hpp"
 #include "engine/ocrash.hpp"
 #include "engine/oferrari.hpp"
 #include "engine/ohud.hpp"
@@ -46,6 +47,10 @@ namespace
     static int g_crash_ffb_direction = 1;
     static int g_crash_ffb_landing_frames = 0;
 
+    static bool g_start_sequence_ffb_active = false;
+    static bool g_prestart_sine_active = false;
+    static int g_prestart_sine_gain = 0;
+
     static int crash_ffb_command(int direction)
     {
         return direction < 0 ? 0x07 : 0x09;
@@ -58,6 +63,158 @@ namespace
         g_crash_ffb_last_spin_count = -1;
         g_crash_ffb_direction = 1;
         g_crash_ffb_landing_frames = 0;
+    }
+
+    static void reset_start_sequence_ffb_tracking()
+    {
+        g_start_sequence_ffb_active = false;
+        g_prestart_sine_active = false;
+        g_prestart_sine_gain = 0;
+    }
+
+    static void set_start_intro_force(int gain_percent)
+    {
+        if (gain_percent < 10)
+            gain_percent = 10;
+
+        // Never let the automatic intro steering exceed the user's master
+        // FFB strength. This keeps the effect deliberately restrained.
+        if (gain_percent > config.controls.ffb_strength)
+            gain_percent = config.controls.ffb_strength;
+
+        forcefeedback::set_gain(gain_percent);
+        forcefeedback::set(0x09, 7);
+        forcefeedback::set_gain(config.controls.ffb_strength);
+    }
+
+    static void update_prestart_sine(int pedal)
+    {
+        if (pedal < 0)
+            pedal = 0;
+        else if (pedal > 0xFF)
+            pedal = 0xFF;
+
+        // Reuse the tyre-slip sine effect, but ramp its effective gain with
+        // the throttle. At full pedal it can only reach the configured master
+        // FFB strength, so it remains lighter than the crash forces.
+        int target_gain =
+            (pedal * config.controls.ffb_strength + 0x7F) /
+            0xFF;
+
+        if (target_gain < 10)
+            target_gain = 0;
+
+        // Add a short mechanical build-up even if the pedal is stamped down.
+        // At the default 50% master gain this takes about a third of a second.
+        if (g_prestart_sine_gain < target_gain)
+        {
+            g_prestart_sine_gain += 5;
+            if (g_prestart_sine_gain > target_gain)
+                g_prestart_sine_gain = target_gain;
+        }
+        else if (g_prestart_sine_gain > target_gain)
+        {
+            g_prestart_sine_gain -= 7;
+            if (g_prestart_sine_gain < target_gain)
+                g_prestart_sine_gain = target_gain;
+        }
+
+        if (g_prestart_sine_gain < 10)
+        {
+            if (g_prestart_sine_active)
+            {
+                forcefeedback::set_tyre_slip(false);
+                g_prestart_sine_active = false;
+            }
+
+            return;
+        }
+
+        // set_tyre_slip() only rebuilds the sine parameters when its active
+        // state changes. Restart it only while the ramp value changes; once
+        // the pedal is steady the effect simply keeps running.
+        if (!g_prestart_sine_active ||
+            g_prestart_sine_gain != target_gain)
+        {
+            if (g_prestart_sine_active)
+                forcefeedback::set_tyre_slip(false);
+
+            forcefeedback::set_gain(g_prestart_sine_gain);
+            forcefeedback::set_tyre_slip(true);
+            forcefeedback::set_gain(config.controls.ffb_strength);
+            g_prestart_sine_active = true;
+        }
+    }
+
+    static bool apply_start_sequence_ffb()
+    {
+        const bool intro_driving =
+            outrun.game_state == GS_START1 &&
+            oferrari.state == OFerrari::FERRARI_SEQ2;
+
+        const bool waiting_for_start =
+            outrun.game_state == GS_START2 ||
+            outrun.game_state == GS_START3 ||
+            (outrun.game_state == GS_START1 &&
+             oferrari.state == OFerrari::FERRARI_LOGIC);
+
+        if (!intro_driving && !waiting_for_start)
+        {
+            if (g_start_sequence_ffb_active)
+            {
+                if (g_prestart_sine_active)
+                    forcefeedback::set_tyre_slip(false);
+
+                forcefeedback::set_gain(config.controls.ffb_strength);
+                forcefeedback::stop();
+                reset_start_sequence_ffb_tracking();
+            }
+
+            return false;
+        }
+
+        g_start_sequence_ffb_active = true;
+
+        if (intro_driving)
+        {
+            if (g_prestart_sine_active)
+            {
+                forcefeedback::set_tyre_slip(false);
+                g_prestart_sine_active = false;
+                g_prestart_sine_gain = 0;
+            }
+
+            // The intro is an animation rather than normal steering physics.
+            // Follow the actual Ferrari sprite position: while the car arcs in
+            // from the right, apply a restrained right-hand steering load and
+            // progressively relax it as the sprite reaches the centre line.
+            const int sprite_x =
+                oanimseq.anim_ferrari.sprite
+                ? std::abs(static_cast<int>(oanimseq.anim_ferrari.sprite->x))
+                : 0;
+
+            if (oferrari.car_state == OFerrari::CAR_ANIM_SEQ &&
+                sprite_x > 4)
+            {
+                int intro_gain = 10 + (sprite_x / 10);
+                if (intro_gain > 18)
+                    intro_gain = 18;
+
+                set_start_intro_force(intro_gain);
+            }
+            else
+            {
+                forcefeedback::stop();
+            }
+
+            return true;
+        }
+
+        // Ferrari is parked on the grid. The real pedal value remains live
+        // during the countdown, so use it to build a light engine/rev shake.
+        forcefeedback::stop();
+        update_prestart_sine(oinputs.acc_adjust);
+        return true;
     }
 
     static void prepare_crash_ffb_tracking()
@@ -295,6 +452,7 @@ void OOutputs::init()
     chute2.counter[2]  = 0;
 
     reset_crash_ffb_tracking();
+    reset_start_sequence_ffb_tracking();
 
     // Always restore the configured base spring when outputs are reset,
     // for example when returning to the menu after a high-speed curve.
@@ -446,6 +604,9 @@ void OOutputs::tick(int16_t input_motor)
         // Force Feedback Steering Wheels
         case MODE_FFEEDBACK:
         {
+            const bool start_sequence_ffb =
+                apply_start_sequence_ffb();
+
             const bool tyre_slip =
                 outrun.game_state == GS_INGAME &&
                 outrun.SkiddingOnRoad() &&
@@ -453,12 +614,21 @@ void OOutputs::tick(int16_t input_motor)
                 !ocrash.skid_counter &&
                 oferrari.wheel_state == OFerrari::WHEELS_ON;
 
-            forcefeedback::set_tyre_slip(tyre_slip);
+            // During the countdown the same sine channel is temporarily used
+            // for the throttle/rev shake. Normal tyre-slip owns it again as
+            // soon as the game enters GS_INGAME.
+            if (!start_sequence_ffb)
+                forcefeedback::set_tyre_slip(tyre_slip);
 
             prepare_crash_ffb_tracking();
             update_centering_strength();
 
-            if (ocrash.crash_counter)
+            if (start_sequence_ffb)
+            {
+                hw_motor_control = MOTOR_OFF;
+                skid_ffb_active = false;
+            }
+            else if (ocrash.crash_counter)
             {
                 // The modern FFB crash sequence replaces the old moving-cabinet
                 // vibration table while a scenery crash is active.
@@ -560,10 +730,6 @@ bool OOutputs::diag_motor(int16_t input_motor, uint8_t hw_motor_limit)
             motor_state = STATE_LEFT;
             break;
 
-        case STATE_LEFT:
-            diag_left(input_motor, hw_motor_limit);
-            break;
-
         case STATE_RIGHT:
             diag_right(input_motor, hw_motor_limit);
             break;
@@ -574,6 +740,10 @@ bool OOutputs::diag_motor(int16_t input_motor, uint8_t hw_motor_limit)
 
         case STATE_DONE:
             diag_done();
+            break;
+
+        case STATE_LEFT:
+            diag_left(input_motor, hw_motor_limit);
             break;
     }
 
@@ -588,7 +758,7 @@ bool OOutputs::diag_motor(int16_t input_motor, uint8_t hw_motor_limit)
 
 void OOutputs::diag_left(int16_t input_motor, uint8_t hw_motor_limit)
 {
-    // If Right Limit Reached, Move Left
+    // If Right Limit Set, Move Left
     if (hw_motor_limit & BIT_5)
     {
         if (--counter >= 0)
@@ -698,7 +868,7 @@ bool OOutputs::calibrate_motor(int16_t input_motor, uint8_t hw_motor_limit)
             ohud.blit_text_big(      2,  "MOTOR CALIBRATION");
             ohud.blit_text_new(col1, 10, "MOVE LEFT   -");
             ohud.blit_text_new(col1, 12, "MOVE RIGHT  -");
-            ohud.blit_text_new(col1, 14, "MOVE CENTRE -");
+            ohud.blit_text_new(col1, 14, "CENTRE");
             counter          = 25;
             motor_centre_pos = 0;
             motor_enabled    = true;

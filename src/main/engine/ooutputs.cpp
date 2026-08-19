@@ -50,6 +50,7 @@ namespace
     static bool g_start_sequence_ffb_active = false;
     static bool g_prestart_sine_active = false;
     static int g_prestart_sine_gain = 0;
+    static int g_prestart_sine_applied_gain = 0;
 
     static int crash_ffb_command(int direction)
     {
@@ -70,6 +71,7 @@ namespace
         g_start_sequence_ffb_active = false;
         g_prestart_sine_active = false;
         g_prestart_sine_gain = 0;
+        g_prestart_sine_applied_gain = 0;
     }
 
     static void set_start_intro_force(int gain_percent)
@@ -125,16 +127,17 @@ namespace
             {
                 forcefeedback::set_tyre_slip(false);
                 g_prestart_sine_active = false;
+                g_prestart_sine_applied_gain = 0;
             }
 
             return;
         }
 
         // set_tyre_slip() only rebuilds the sine parameters when its active
-        // state changes. Restart it only while the ramp value changes; once
-        // the pedal is steady the effect simply keeps running.
+        // state changes. Restart it only when the ramp actually reaches a new
+        // gain value; once the pedal is steady the effect simply keeps running.
         if (!g_prestart_sine_active ||
-            g_prestart_sine_gain != target_gain)
+            g_prestart_sine_gain != g_prestart_sine_applied_gain)
         {
             if (g_prestart_sine_active)
                 forcefeedback::set_tyre_slip(false);
@@ -143,6 +146,7 @@ namespace
             forcefeedback::set_tyre_slip(true);
             forcefeedback::set_gain(config.controls.ffb_strength);
             g_prestart_sine_active = true;
+            g_prestart_sine_applied_gain = g_prestart_sine_gain;
         }
     }
 
@@ -182,6 +186,7 @@ namespace
                 forcefeedback::set_tyre_slip(false);
                 g_prestart_sine_active = false;
                 g_prestart_sine_gain = 0;
+                g_prestart_sine_applied_gain = 0;
             }
 
             // The intro is an animation rather than normal steering physics.
@@ -730,6 +735,10 @@ bool OOutputs::diag_motor(int16_t input_motor, uint8_t hw_motor_limit)
             motor_state = STATE_LEFT;
             break;
 
+        case STATE_LEFT:
+            diag_left(input_motor, hw_motor_limit);
+            break;
+
         case STATE_RIGHT:
             diag_right(input_motor, hw_motor_limit);
             break;
@@ -740,10 +749,6 @@ bool OOutputs::diag_motor(int16_t input_motor, uint8_t hw_motor_limit)
 
         case STATE_DONE:
             diag_done();
-            break;
-
-        case STATE_LEFT:
-            diag_left(input_motor, hw_motor_limit);
             break;
     }
 
@@ -758,7 +763,7 @@ bool OOutputs::diag_motor(int16_t input_motor, uint8_t hw_motor_limit)
 
 void OOutputs::diag_left(int16_t input_motor, uint8_t hw_motor_limit)
 {
-    // If Right Limit Set, Move Left
+    // If Right Limit Reached, Move Left
     if (hw_motor_limit & BIT_5)
     {
         if (--counter >= 0)
@@ -868,7 +873,7 @@ bool OOutputs::calibrate_motor(int16_t input_motor, uint8_t hw_motor_limit)
             ohud.blit_text_big(      2,  "MOTOR CALIBRATION");
             ohud.blit_text_new(col1, 10, "MOVE LEFT   -");
             ohud.blit_text_new(col1, 12, "MOVE RIGHT  -");
-            ohud.blit_text_new(col1, 14, "CENTRE");
+            ohud.blit_text_new(col1, 14, "MOVE CENTRE -");
             counter          = 25;
             motor_centre_pos = 0;
             motor_enabled    = true;

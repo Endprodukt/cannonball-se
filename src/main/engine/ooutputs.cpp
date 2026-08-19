@@ -84,6 +84,7 @@ void OOutputs::init()
     // for example when returning to the menu after a high-speed curve.
     if (mode == MODE_FFEEDBACK && forcefeedback::is_supported())
     {
+        forcefeedback::set_tyre_slip(false);
         forcefeedback::set_centering_strength(
             config.controls.centering_strength);
         ffb_centering_strength =
@@ -182,10 +183,20 @@ void OOutputs::tick(int16_t input_motor)
 
         // Force Feedback Steering Wheels
         case MODE_FFEEDBACK:
+        {
+            const bool tyre_slip =
+                outrun.game_state == GS_INGAME &&
+                outrun.SkiddingOnRoad() &&
+                !ocrash.crash_counter &&
+                !ocrash.skid_counter &&
+                oferrari.wheel_state == OFerrari::WHEELS_ON;
+
+            forcefeedback::set_tyre_slip(tyre_slip);
             update_centering_strength();
             do_motors(mode, input_motor);   // Use X-Position of wheel instead of motor position
             motor_output(hw_motor_control); // Force Feedback Handling
             break;
+        }
 
         // SMARTYPI: Real Cabinet
         case MODE_CABINET:

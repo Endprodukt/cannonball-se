@@ -522,9 +522,9 @@ static void play_stats_and_watchdog_updater() {
     while (cannonball::state != STATE_QUIT) {
         if ((run_time.get_ticks() >= 60000) &&
             (cannonball::state == STATE_GAME) ) {
-            config.stats.runtime++;  // increment machine run-time by 1 (minute)
-            config.save_stats();     // save stats file
-            run_time.start();        // reset timer
+            config.stats.runtime++;  // increment machine run-time counter by 1 (minute)
+            config.save_stats();     // save the stats to the file
+            run_time.start();        // reset the timer
         }
         SDL_Delay(500); // wait 0.5 seconds before next check
 
@@ -772,7 +772,7 @@ static void main_loop() {
         } else if (!vsync) {
             if (now < nextFrameTime) {
                 auto sleepDuration = nextFrameTime - now;
-                // Only record sleep if running at 30 FPS.
+                // Only record sleep if we're at 30 FPS.
                 totalSleepTime += sleepDuration * (configured_fps == 30);
 
                 std::this_thread::sleep_for(sleepDuration);
@@ -783,7 +783,7 @@ static void main_loop() {
         // Update the next frame time.
         nextFrameTime += frameDuration;
 
-        // Record FPS info on console (every 2 seconds)
+        // Record FPS info on console (every 2 seconds) and FPS on-screen if enabled
         auto elapsed = std::chrono::steady_clock::now() - fpsTimer;
         if (elapsed >= std::chrono::seconds(2)) {
             int fps = renderedFrames / 2;

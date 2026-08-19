@@ -133,6 +133,10 @@ int set(int command, int force) // command is unused; keep for ABI compatibility
     return 0;
 }
 
+void set_tyre_slip(bool)
+{
+}
+
 void stop()
 {
     if (g_pEffect)
@@ -190,8 +194,11 @@ namespace forcefeedback
     static LPDIRECTINPUTDEVICE8 g_pDevice = nullptr;
     static LPDIRECTINPUTEFFECT  g_pEffect = nullptr;
     static LPDIRECTINPUTEFFECT  g_pSpringEffect = nullptr;
+    static LPDIRECTINPUTEFFECT  g_pTyreSlipEffect = nullptr;
     static bool g_supported = false;
     static bool g_enabled = true;
+    static bool g_tyre_slip_active = false;
+    static bool g_tyre_slip_create_attempted = false;
     static int  g_centering_percent = 30;
     static int  g_gain_percent = 100;
     static int g_max_force = 10000;
@@ -204,8 +211,16 @@ namespace forcefeedback
     {
         g_enabled = enabled;
 
-        if (!g_enabled && g_pEffect)
-            g_pEffect->Stop();
+        if (!g_enabled)
+        {
+            if (g_pEffect)
+                g_pEffect->Stop();
+
+            if (g_pTyreSlipEffect)
+                g_pTyreSlipEffect->Stop();
+
+            g_tyre_slip_active = false;
+        }
     }
 
     void set_gain(int percent)
@@ -227,6 +242,13 @@ namespace forcefeedback
 
         g_centering_percent = percent;
 
+        // Tyre slip temporarily lightens the current steering load while
+        // retaining the configured/dynamic spring value for instant recovery.
+        const int effective_percent =
+            g_tyre_slip_active
+            ? (g_centering_percent * 80 + 50) / 100
+            : g_centering_percent;
+
 
         // Spring not created yet.
         // The stored percentage will be used by create_spring_effect().
@@ -235,7 +257,7 @@ namespace forcefeedback
 
 
         // 0% means completely disable centering.
-        if (g_centering_percent == 0)
+        if (effective_percent == 0)
         {
             g_pSpringEffect->Stop();
             return;
@@ -249,7 +271,7 @@ namespace forcefeedback
 
         const LONG strength =
             DI_FFNOMINALMAX *
-            g_centering_percent /
+            effective_percent /
             100;
 
 
@@ -612,8 +634,13 @@ namespace forcefeedback
 
         condition.lOffset = 0;
 
+        const int effective_percent =
+            g_tyre_slip_active
+            ? (g_centering_percent * 80 + 50) / 100
+            : g_centering_percent;
+
         const LONG strength =
-            DI_FFNOMINALMAX * g_centering_percent / 100;
+            DI_FFNOMINALMAX * effective_percent / 100;
 
         // DirectInput spring coefficient
         condition.lPositiveCoefficient = strength;
@@ -747,6 +774,144 @@ namespace forcefeedback
 
         return true;
     }
+
+    // -----------------------------------------------------------------------------
+    // Tyre-slip vibration
+    // -----------------------------------------------------------------------------
+
+    static bool create_tyre_slip_effect()
+    {
+        if (!g_pDevice)
+            return false;
+
+        DWORD axis = DIJOFS_X;
+        LONG direction[1] = { 1 };
+
+        DIPERIODIC periodic{};
+        periodic.dwMagnitude = 0;
+        periodic.lOffset = 0;
+        periodic.dwPhase = 0;
+        periodic.dwPeriod = DI_SECONDS / 22;
+
+        DIEFFECT effect{};
+        effect.dwSize = sizeof(DIEFFECT);
+        effect.dwFlags = DIEFF_CARTESIAN | DIEFF_OBJECTOFFSETS;
+        effect.dwDuration = INFINITE;
+        effect.dwSamplePeriod = 0;
+        effect.dwGain = DI_FFNOMINALMAX;
+        effect.dwTriggerButton = DIEB_NOTRIGGER;
+        effect.dwTriggerRepeatInterval = 0;
+        effect.cAxes = 1;
+        effect.rgdwAxes = &axis;
+        effect.rglDirection = direction;
+        effect.lpEnvelope = nullptr;
+        effect.cbTypeSpecificParams = sizeof(DIPERIODIC);
+        effect.lpvTypeSpecificParams = &periodic;
+        effect.dwStartDelay = 0;
+
+        HRESULT hr =
+            g_pDevice->CreateEffect(
+                GUID_Sine,
+                &effect,
+                &g_pTyreSlipEffect,
+                nullptr);
+
+        if (FAILED(hr) || !g_pTyreSlipEffect)
+        {
+            std::cout
+                << "DirectInput: tyre-slip sine effect unavailable: 0x"
+                << std::hex
+                << (unsigned long)hr
+                << std::dec
+                << std::endl;
+
+            g_pTyreSlipEffect = nullptr;
+            return false;
+        }
+
+        return true;
+    }
+
+    void set_tyre_slip(bool active)
+    {
+        if (!g_supported || !g_enabled || !g_pDevice)
+            active = false;
+
+        if (active == g_tyre_slip_active)
+            return;
+
+        g_tyre_slip_active = active;
+
+        // Reapply the last requested spring immediately. set_centering_strength()
+        // applies the temporary 20% reduction while tyre slip is active.
+        set_centering_strength(g_centering_percent);
+
+        if (!active)
+        {
+            if (g_pTyreSlipEffect)
+                g_pTyreSlipEffect->Stop();
+
+            return;
+        }
+
+        if (!g_pTyreSlipEffect)
+        {
+            if (g_tyre_slip_create_attempted)
+                return;
+
+            g_tyre_slip_create_attempted = true;
+
+            if (!create_tyre_slip_effect())
+                return;
+        }
+
+        DIPERIODIC periodic{};
+        periodic.dwMagnitude =
+            static_cast<DWORD>(
+                (static_cast<long long>(DI_FFNOMINALMAX) * 12 * g_gain_percent) /
+                10000);
+        periodic.lOffset = 0;
+        periodic.dwPhase = 0;
+        periodic.dwPeriod = DI_SECONDS / 22;
+
+        DIEFFECT effect{};
+        effect.dwSize = sizeof(DIEFFECT);
+        effect.cbTypeSpecificParams = sizeof(DIPERIODIC);
+        effect.lpvTypeSpecificParams = &periodic;
+
+        HRESULT hr =
+            g_pTyreSlipEffect->SetParameters(
+                &effect,
+                DIEP_TYPESPECIFICPARAMS |
+                DIEP_START);
+
+        if (hr == DIERR_INPUTLOST ||
+            hr == DIERR_NOTACQUIRED ||
+            hr == DIERR_NOTEXCLUSIVEACQUIRED)
+        {
+            g_pDevice->Unacquire();
+
+            if (SUCCEEDED(g_pDevice->Acquire()))
+            {
+                hr =
+                    g_pTyreSlipEffect->SetParameters(
+                        &effect,
+                        DIEP_TYPESPECIFICPARAMS |
+                        DIEP_START);
+            }
+        }
+
+        if (FAILED(hr))
+        {
+            std::cout
+                << "DirectInput: unable to start tyre-slip effect: 0x"
+                << std::hex
+                << (unsigned long)hr
+                << std::dec
+                << std::endl;
+        }
+    }
+
     // -----------------------------------------------------------------------------
     // Initialise
     // -----------------------------------------------------------------------------
@@ -1208,6 +1373,13 @@ namespace forcefeedback
 
     void close()
     {
+        if (g_pTyreSlipEffect)
+        {
+            g_pTyreSlipEffect->Stop();
+            g_pTyreSlipEffect->Release();
+            g_pTyreSlipEffect = nullptr;
+        }
+
         if (g_pSpringEffect)
         {
             g_pSpringEffect->Stop();
@@ -1248,6 +1420,8 @@ namespace forcefeedback
 
 
         g_num_ff_axes = 0;
+        g_tyre_slip_active = false;
+        g_tyre_slip_create_attempted = false;
 
         g_supported = false;
     }
@@ -1266,6 +1440,7 @@ namespace forcefeedback
 namespace forcefeedback {
 bool init(int, int, int) { return false; }
 int  set(int, int) { return -1; }
+void set_tyre_slip(bool) {}
 void close() {}
 bool is_supported() { return false; }
 }

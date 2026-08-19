@@ -193,6 +193,28 @@ static bool ffb_shift_active = false;
 static int ffb_shift_direction = 1;
 static Uint32 ffb_shift_start_ms = 0;
 
+// Short mechanical detent when moving between music-selection positions.
+static bool ffb_music_detent_active = false;
+static int ffb_music_last_selection = -1;
+static int ffb_music_last_steering = 0;
+static int ffb_music_detent_direction = 0;
+static Uint32 ffb_music_detent_start_ms = 0;
+
+static void set_music_detent_force(int direction, int gain_percent)
+{
+    int scaled_gain =
+        (config.controls.ffb_strength * gain_percent + 50) / 100;
+
+    if (scaled_gain < 10)
+        scaled_gain = 10;
+    else if (scaled_gain > 100)
+        scaled_gain = 100;
+
+    forcefeedback::set_gain(scaled_gain);
+    forcefeedback::set(direction, 7);
+    forcefeedback::set_gain(config.controls.ffb_strength);
+}
+
 
 // ------------------------------------------------------------------------------------------------
 
@@ -352,6 +374,81 @@ static void tick()
             input.set_rumble(outrun.outputs->is_set(OOutputs::D_MOTOR), config.controls.rumble, 0);
     }
 
+    // Music-selection wheel detent. This deliberately runs after normal output
+    // processing so the stationary-car FFB path cannot stop it in the same frame.
+    if (config.controls.haptic &&
+        forcefeedback::is_supported() &&
+        cannonball::state == STATE_GAME &&
+        outrun.game_state == GS_MUSIC)
+    {
+        const int selection = omusic.get_music_selected();
+        const int steering = oinputs.steering_adjust;
+
+        if (ffb_music_last_selection < 0)
+        {
+            // Initialise tracking without kicking the wheel when the screen opens.
+            ffb_music_last_selection = selection;
+            ffb_music_last_steering = steering;
+        }
+        else if (selection != ffb_music_last_selection)
+        {
+            const int steering_delta =
+                steering - ffb_music_last_steering;
+
+            if (steering_delta > 0)
+                ffb_music_detent_direction = 1;
+            else if (steering_delta < 0)
+                ffb_music_detent_direction = -1;
+            else
+                ffb_music_detent_direction =
+                    selection > ffb_music_last_selection ? 1 : -1;
+
+            ffb_music_detent_active = true;
+            ffb_music_detent_start_ms = SDL_GetTicks();
+            ffb_music_last_selection = selection;
+        }
+
+        ffb_music_last_steering = steering;
+
+        if (ffb_music_detent_active)
+        {
+            const Uint32 elapsed =
+                SDL_GetTicks() - ffb_music_detent_start_ms;
+
+            // On this DirectInput path 0x07 physically pulls the current wheel
+            // right and 0x09 left. First resist the player's movement, then
+            // briefly snap into the newly selected position.
+            const int resistance_direction =
+                ffb_music_detent_direction > 0 ? 0x09 : 0x07;
+            const int snap_direction =
+                ffb_music_detent_direction > 0 ? 0x07 : 0x09;
+
+            if (elapsed < 55)
+            {
+                set_music_detent_force(resistance_direction, 70);
+            }
+            else if (elapsed < 85)
+            {
+                set_music_detent_force(snap_direction, 45);
+            }
+            else
+            {
+                forcefeedback::stop();
+                ffb_music_detent_active = false;
+            }
+        }
+    }
+    else
+    {
+        if (ffb_music_detent_active)
+            forcefeedback::stop();
+
+        ffb_music_detent_active = false;
+        ffb_music_last_selection = -1;
+        ffb_music_last_steering = oinputs.steering_adjust;
+        ffb_music_detent_direction = 0;
+    }
+
     // Gear shift kick. This runs after normal game FFB so the on-road code
     // cannot stop the transient in the same frame.
     if (ffb_shift_active)
@@ -409,7 +506,7 @@ static void play_stats_and_watchdog_updater() {
         // Set the watchdog timeout (in seconds)
         int timeout = 15; // 15 seconds is the maximum supported on Raspberry Pi
         if (ioctl(g_watchdog_fd, WDIOC_SETTIMEOUT, &timeout) < 0) {
-            std::cerr << "Note: Unable to set watchdog timeout - proceeding without system watchdog." << std::endl;
+            std::cerr << "Note: Unable to set " << SYSTEM_WATCHDOG << " timeout" << std::endl;
             close(g_watchdog_fd);
             g_watchdog_fd = -1;
         } else {

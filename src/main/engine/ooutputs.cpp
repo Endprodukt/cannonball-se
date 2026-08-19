@@ -146,7 +146,10 @@ void OOutputs::update_centering_strength()
         else if (curve_percent > 100)
             curve_percent = 100;
 
-        const int max_boost_points = 30;
+        // Scale the dynamic cornering load with the configured spring.
+        // At 30% this preserves the current maximum (+30 points), while
+        // lower spring settings reduce both centering and cornering load.
+        const int max_boost_points = base_strength;
 
         const int boost_points =
             (max_boost_points * speed_factor * curve_percent +
@@ -1258,4 +1261,5 @@ void OOutputs::coin_chute_out(CoinChute* chute, bool insert)
         chute->counter[0] = 6;
         set_digital(chute->output_bit);
     }
+    return 0;
 }

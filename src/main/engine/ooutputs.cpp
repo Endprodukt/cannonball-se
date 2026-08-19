@@ -456,7 +456,7 @@ bool OOutputs::calibrate_motor(int16_t input_motor, uint8_t hw_motor_limit)
 
 void OOutputs::calibrate_left(int16_t input_motor, uint8_t hw_motor_limit)
 {
-    // If Right Limit Reached, Move Left
+    // If Right Limit Set, Move Left
     if (hw_motor_limit & BIT_5)
     {
         if (--counter >= 0)

@@ -456,7 +456,7 @@ bool OOutputs::calibrate_motor(int16_t input_motor, uint8_t hw_motor_limit)
 
 void OOutputs::calibrate_left(int16_t input_motor, uint8_t hw_motor_limit)
 {
-    // If Right Limit Set, Move Left
+    // If Right Limit Reached, Move Left
     if (hw_motor_limit & BIT_5)
     {
         if (--counter >= 0)
@@ -1261,5 +1261,4 @@ void OOutputs::coin_chute_out(CoinChute* chute, bool insert)
         chute->counter[0] = 6;
         set_digital(chute->output_bit);
     }
-    return 0;
 }

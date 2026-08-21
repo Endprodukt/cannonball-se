@@ -215,6 +215,21 @@ static void set_music_detent_force(int direction, int gain_percent)
     forcefeedback::set_gain(config.controls.ffb_strength);
 }
 
+static void set_shift_force(int direction, int force)
+{
+    int scaled_gain =
+        (config.controls.ffb_strength * 85 + 50) / 100;
+
+    if (scaled_gain < 10)
+        scaled_gain = 10;
+    else if (scaled_gain > 100)
+        scaled_gain = 100;
+
+    forcefeedback::set_gain(scaled_gain);
+    forcefeedback::set(direction, force);
+    forcefeedback::set_gain(config.controls.ffb_strength);
+}
+
 
 // ------------------------------------------------------------------------------------------------
 
@@ -381,6 +396,11 @@ static void tick()
         cannonball::state == STATE_GAME &&
         outrun.game_state == GS_MUSIC)
     {
+        // Clear any transient left over from the attract/demo frame before the
+        // music selector establishes its own detent for the first time.
+        if (ffb_music_last_selection < 0)
+            forcefeedback::stop();
+
         const int selection = omusic.get_music_selected();
         const int steering = oinputs.steering_adjust;
 
@@ -470,11 +490,11 @@ static void tick()
 
             if (elapsed < 45)
             {
-                forcefeedback::set(primary_direction, 0);
+                set_shift_force(primary_direction, 0);
             }
             else if (elapsed < 80)
             {
-                forcefeedback::set(rebound_direction, 7);
+                set_shift_force(rebound_direction, 7);
             }
             else
             {

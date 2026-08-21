@@ -237,7 +237,8 @@ namespace
 
     static void prepare_crash_ffb_tracking()
     {
-        if (!ocrash.crash_counter)
+        if (outrun.game_state != GS_INGAME ||
+            !ocrash.crash_counter)
         {
             if (g_crash_ffb_type != CRASH_FFB_NONE)
                 forcefeedback::stop();
@@ -280,7 +281,8 @@ namespace
 
     static void apply_crash_ffb_force()
     {
-        if (!ocrash.crash_counter ||
+        if (outrun.game_state != GS_INGAME ||
+            !ocrash.crash_counter ||
             g_crash_ffb_type == CRASH_FFB_NONE)
         {
             return;
@@ -646,7 +648,8 @@ void OOutputs::tick(int16_t input_motor)
                 hw_motor_control = MOTOR_OFF;
                 skid_ffb_active = false;
             }
-            else if (ocrash.crash_counter)
+            else if (outrun.game_state == GS_INGAME &&
+                     ocrash.crash_counter)
             {
                 // The modern FFB crash sequence replaces the old moving-cabinet
                 // vibration table while a scenery crash is active.

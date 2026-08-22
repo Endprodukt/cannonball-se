@@ -28,6 +28,7 @@
 #include "globals.hpp"
 #include "frontend/config.hpp"
 #include "engine/oroad.hpp"
+#include "texture_export.hpp"
 
 #include "sdl2/pixelscaler_renderer.hpp"
 
@@ -197,6 +198,7 @@ void Video::prepare_frame()
     {
         // OutRun Hardware Video Emulation
         tile_layer->update_tile_values();
+        tile_layer->export_composite_layers();
 
         (hwroad.*hwroad.render_background)(pixels);
         tile_layer->render_tile_layer(pixels, 1, 0);      // background layer
@@ -205,6 +207,7 @@ void Video::prepare_frame()
         if (!config.engine.fix_bugs || oroad.horizon_base != ORoad::HORIZON_OFF)
             (hwroad.*hwroad.render_foreground)(pixels);
 
+        sprite_layer->export_visible_sprites();
         sprite_layer->render(pixels, 8);
         tile_layer->render_text_layer(pixels, 1);
     }
@@ -249,7 +252,7 @@ void Video::write_text8(uint32_t addr, const uint8_t data)
 
 void Video::write_text16(uint32_t* addr, const uint16_t data)
 {
-    const uint32_t base = (*addr) & 0x0FFFu;      // 4 KiB text RAM
+    const uint32_t base = (*addr) & 0x0FFFu;      // 4 KiB text RAM
     const uint16_t le = std::byteswap(data);
     std::memcpy(&tile_layer->text_ram[base], &le, sizeof(le));
     *addr += 2;
@@ -267,7 +270,7 @@ void Video::write_text16(uint32_t* addr, const uint16_t data)
 
 void Video::write_text16(uint32_t addr, const uint16_t data)
 {
-    const uint32_t base = addr & 0x0FFFu;      // 4 KiB text RAM
+    const uint32_t base = addr & 0x0FFFu;      // 4 KiB text RAM
     const uint16_t le = std::byteswap(data);
     std::memcpy(&tile_layer->text_ram[base], &le, sizeof(le));
 }
@@ -282,12 +285,11 @@ void Video::write_text16(uint32_t addr, const uint16_t data)
 
 void Video::write_text32(uint32_t* addr, const uint32_t data)
 {
-    const uint32_t base = (*addr) & 0x0FFFu;      // 4 KiB text RAM
+    const uint32_t base = (*addr) & 0x0FFFu;      // 4 KiB text RAM
     const uint32_t le = std::byteswap(data);
     std::memcpy(&tile_layer->text_ram[base], &le, sizeof(le));
     *addr += 4;
 }
-
 
 /*
 void Video::write_text32(uint32_t* addr, const uint32_t data)
@@ -303,7 +305,7 @@ void Video::write_text32(uint32_t* addr, const uint32_t data)
 
 void Video::write_text32(uint32_t addr, const uint32_t data)
 {
-    const uint32_t base = addr & 0x0FFFu;      // 4 KiB text RAM
+    const uint32_t base = addr & 0x0FFFu;      // 4 KiB text RAM
     const uint32_t le = std::byteswap(data);
     std::memcpy(&tile_layer->text_ram[base], &le, sizeof(le));
 }
@@ -340,9 +342,9 @@ void Video::write_tile8(uint32_t addr, const uint8_t data)
 
 void Video::write_tile16(uint32_t* addr, const uint16_t data)
 {
-    // The tile RAM is 64 kB; wrap the address into that range
+    // The tile RAM is 64 kB; wrap the address into that range
     const uint32_t index = (*addr) & 0xFFFFU;
-    const uint16_t le = std::byteswap(data);   // big‑endian → little‑endian
+    const uint16_t le = std::byteswap(data);   // big-endian -> little-endian
     std::memcpy(&tile_layer->tile_ram[index], &le, sizeof(le));
     *addr += 2;
 }
@@ -359,9 +361,9 @@ void Video::write_tile16(uint32_t* addr, const uint16_t data)
 
 void Video::write_tile16(uint32_t addr, const uint16_t data)
 {
-    // The tile RAM is 64 kB; wrap the address into that range
+    // The tile RAM is 64 kB; wrap the address into that range
     const uint32_t index = addr & 0xFFFFU;
-    const uint16_t le = std::byteswap(data);   // big‑endian → little‑endian
+    const uint16_t le = std::byteswap(data);   // big-endian -> little-endian
     std::memcpy(&tile_layer->tile_ram[index], &le, sizeof(le));
 }
 
@@ -375,9 +377,9 @@ void Video::write_tile16(uint32_t addr, const uint16_t data)
 
 void Video::write_tile32(uint32_t* addr, const uint32_t data)
 {
-    // The tile RAM is 64 kB – wrap the supplied address.
+    // The tile RAM is 64 kB - wrap the supplied address.
     const uint32_t index = (*addr) & 0xFFFFU;
-    const uint32_t le = std::byteswap(data);  // big‑endian → little‑endian
+    const uint32_t le = std::byteswap(data);  // big-endian -> little-endian
     std::memcpy(&tile_layer->tile_ram[index], &le, sizeof(le));
     *addr += 4;
 }
@@ -396,9 +398,9 @@ void Video::write_tile32(uint32_t* addr, const uint32_t data)
 
 void Video::write_tile32(uint32_t addr, const uint32_t data)
 {
-    // The tile RAM is 64 kB; wrap the address into that range
+    // The tile RAM is 64 kB; wrap the address into that range
     const uint32_t index = addr & 0xFFFFU;
-    const uint32_t le = std::byteswap(data);   // big‑endian → little‑endian
+    const uint32_t le = std::byteswap(data);   // big-endian -> little-endian
     std::memcpy(&tile_layer->tile_ram[index], &le, sizeof(le));
 }
 
@@ -416,7 +418,6 @@ uint8_t Video::read_tile8(uint32_t addr)
 {
     return tile_layer->tile_ram[addr & 0xFFFF];
 }
-
 
 // ---------------------------------------------------------------------------
 // Sprite Handling Code
@@ -441,11 +442,11 @@ void Video::write_pal8(uint32_t* palAddr, const uint8_t data)
 
 void Video::write_pal16(uint32_t* palAddr, const uint16_t data)
 {
-    // Keep the index inside the 8 KB palette and aligned to a half‑word
-    uint32_t adr = (*palAddr) & (0x1fffu - 1u);   // 0x1fff – 1 = 8190
+    // Keep the index inside the 8 KB palette and aligned to a half-word
+    uint32_t adr = (*palAddr) & (0x1fffu - 1u);   // 0x1fff - 1 = 8190
 
     // Reverse the byte order and write the whole (16-bit) word at once
-    uint16_t word = std::byteswap(data);          // MSB→LSB
+    uint16_t word = std::byteswap(data);          // MSB->LSB
     std::memcpy(&palette[adr], &word, sizeof(word));
 
     refresh_palette(adr);
@@ -468,7 +469,7 @@ void Video::write_pal32(uint32_t* palAddr, const uint32_t data)
     uint32_t adr = *palAddr & (0x1fff - 3); // 0x1fff - 3 = 8188;
 
     // Reverse the byte order and write the whole word at once
-    uint32_t word = std::byteswap(data);   // big‑endian → little‑endian
+    uint32_t word = std::byteswap(data);   // big-endian -> little-endian
     std::memcpy(&palette[adr], &word, sizeof(word));
 
     refresh_palette(adr);
@@ -495,11 +496,11 @@ void Video::write_pal32(uint32_t* palAddr, const uint32_t data)
 
 void Video::write_pal32(uint32_t adr, uint32_t data)
 {
-    // keep adr within the 8‑KB palette, aligned to a 4‑byte word
-    adr &= (0x1fffu - 3u);          // 0x1fff – 3 = 8188
+    // keep adr within the 8-KB palette, aligned to a 4-byte word
+    adr &= (0x1fffu - 3u);          // 0x1fff - 3 = 8188
 
     // Reverse the byte order and write the whole word at once
-    uint32_t word = std::byteswap(data);   // big‑endian → little‑endian
+    uint32_t word = std::byteswap(data);   // big-endian -> little-endian
     std::memcpy(&palette[adr], &word, sizeof(word));
 
     refresh_palette(adr);
@@ -527,11 +528,11 @@ uint8_t Video::read_pal8(uint32_t palAddr)
 
 uint16_t Video::read_pal16(uint32_t palAddr)
 {
-    uint32_t adr = palAddr & (0x1fffu - 1u);    // keep inside 8 KB, 16‑bit aligned
+    uint32_t adr = palAddr & (0x1fffu - 1u);    // keep inside 8 KB, 16-bit aligned
     uint16_t w = 0;
-    std::memcpy(&w, &palette[adr], sizeof(w));  // single 16‑bit load
+    std::memcpy(&w, &palette[adr], sizeof(w));  // single 16-bit load
 
-    return std::byteswap(w);                    // palette is big‑endian
+    return std::byteswap(w);                    // palette is big-endian
 }
 
 /*
@@ -546,7 +547,7 @@ uint16_t Video::read_pal16(uint32_t* palAddr)
 {
     uint32_t adr = (*palAddr) & (0x1fffu - 1u);
 
-    *palAddr += 2;                      // advance the caller’s address
+    *palAddr += 2;                      // advance the caller's address
 
     uint16_t w = 0;
     std::memcpy(&w, &palette[adr], sizeof(w));
@@ -565,17 +566,17 @@ uint16_t Video::read_pal16(uint32_t* palAddr)
 
 uint32_t Video::read_pal32(uint32_t* palAddr)
 {
-    // Keep the index inside the 8 KB palette and aligned to a 4‑byte word
-    uint32_t adr = (*palAddr) & (0x1fffu - 3u);   // 0x1fff – 3 = 8188
+    // Keep the index inside the 8 KB palette and aligned to a 4-byte word
+    uint32_t adr = (*palAddr) & (0x1fffu - 3u);   // 0x1fff - 3 = 8188
 
-    // Advance the caller’s address before we read
+    // Advance the caller's address before we read
     *palAddr += 4;
 
     // Load the whole word at once
     uint32_t word = 0;
     std::memcpy(&word, &palette[adr], sizeof(word));
 
-    // The palette is stored big‑endian; convert to the host format
+    // The palette is stored big-endian; convert to the host format
     return std::byteswap(word);
 }
 
@@ -591,21 +592,21 @@ uint32_t Video::read_pal32(uint32_t* palAddr)
 // Convert internal System 16 RRRR GGGG BBBB format palette to renderer output format
 void Video::refresh_palette(uint32_t palAddr)
 {
-    // Ensure we address an even index – the palette is 16‑bit entries.
+    // Ensure we address an even index - the palette is 16-bit entries.
     palAddr &= ~1u;
 
-    /*  Read the 16‑bit value once.
-        The palette stores a big‑endian word:  high byte first.  */
+    /*  Read the 16-bit value once.
+        The palette stores a big-endian word:  high byte first.  */
     uint16_t a;
-    std::memcpy(&a, &palette[palAddr], sizeof a);   // one 16‑bit copy
+    std::memcpy(&a, &palette[palAddr], sizeof a);   // one 16-bit copy
     a = std::byteswap(a);
 
-    /*  Extract the 5‑bit RGB components in a single operation each.
+    /*  Extract the 5-bit RGB components in a single operation each.
         The logic is equivalent to the original code but needs only
         one shift, one mask and one OR per component.  */
-    uint8_t r = (((a >> 0) & 0x000Fu) << 1) | ((a >> 12) & 1u);   // bits 0‑3, flag bit 12
-    uint8_t g = (((a >> 4) & 0x000Fu) << 1) | ((a >> 13) & 1u); // bits 4‑7, flag bit 13
-    uint8_t b = (((a >> 8) & 0x000Fu) << 1) | ((a >> 14) & 1u); // bits 8‑11, flag bit 14
+    uint8_t r = (((a >> 0) & 0x000Fu) << 1) | ((a >> 12) & 1u);   // bits 0-3, flag bit 12
+    uint8_t g = (((a >> 4) & 0x000Fu) << 1) | ((a >> 13) & 1u); // bits 4-7, flag bit 13
+    uint8_t b = (((a >> 8) & 0x000Fu) << 1) | ((a >> 14) & 1u); // bits 8-11, flag bit 14
 
     renderer->convert_palette(palAddr, r, g, b);
 }

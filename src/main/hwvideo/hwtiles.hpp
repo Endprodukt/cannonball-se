@@ -30,13 +30,15 @@ public:
     void render_text_layer(uint16_t*, uint8_t);
     void render_all_tiles(uint16_t*);
 
-    // Development exporter: writes assembled 1024x512 tilemap layers rather
-    // than individual 8x8 tiles.
+    // Development exporters: the compact variant automatically collapses
+    // repeated 512x256 pages to the smallest repeatable source image.
     void export_composite_layers();
+    void export_compact_layers();
 
     // Development replacement wrappers. video.cpp calls these through macros
     // defined only after the original class declarations are complete.
     void render_tile_layer_with_replacements(uint16_t*, uint8_t, uint8_t);
+    void render_tile_layer_with_compact_replacements(uint16_t*, uint8_t, uint8_t);
     void render_text_layer_with_replacements(uint16_t*, uint8_t);
 
 private:

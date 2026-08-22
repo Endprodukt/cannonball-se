@@ -27,6 +27,9 @@ public:
     void write_road_control(const uint8_t);
     void (HWRoad::*render_background)(uint16_t*);
     void (HWRoad::*render_foreground)(uint16_t*);
+
+    // Development exporter for the solid-fill road background (sky).
+    void export_background_layer();
   
 private:
     uint8_t road_control;

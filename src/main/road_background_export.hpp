@@ -122,14 +122,13 @@ inline void HWRoad::export_background_layer()
     if (key == last_exported_key)
         return;
 
-    const std::filesystem::path export_dir =
-        std::filesystem::path("background_export") / "road";
+    const std::filesystem::path export_dir = "texture_export";
 
     std::error_code ec;
     std::filesystem::create_directories(export_dir, ec);
     if (ec)
     {
-        std::cerr << "Unable to create road background export directory: "
+        std::cerr << "Unable to create texture export directory: "
                   << ec.message() << "\n";
         return;
     }
@@ -164,7 +163,7 @@ inline void HWRoad::export_background_layer()
         return;
     }
 
-    const std::filesystem::path manifest_path = export_dir / "manifest.csv";
+    const std::filesystem::path manifest_path = export_dir / "road_manifest.csv";
     const bool new_manifest =
         !std::filesystem::exists(manifest_path) ||
         std::filesystem::file_size(manifest_path) == 0;

@@ -31,9 +31,11 @@ public:
     void render_all_tiles(uint16_t*);
 
     // Development exporters: the compact variant automatically collapses
-    // repeated 512x256 pages to the smallest repeatable source image.
+    // repeated 512x256 pages to the smallest repeatable source image. The
+    // deduplicated variant also removes identical foreground/background PNGs.
     void export_composite_layers();
     void export_compact_layers();
+    void export_deduplicated_layers();
 
     // Development replacement wrappers. video.cpp calls these through macros
     // defined only after the original class declarations are complete.

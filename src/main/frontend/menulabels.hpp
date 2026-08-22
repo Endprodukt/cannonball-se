@@ -152,7 +152,7 @@ const static char* ENTRY_MUSIC3             = "LAST WAVE";
 const static char* ENTRY_WAVEVOLUME         = "CUSTOM MUSIC PLAYBACK LEVEL "; // JJP .WAV FILE VOLUME ADJUST
 const static char* ENTRY_CALLBACK_RATE      = "CALLBACK RATE ";        // JJP - 8ms or 16ms callback rates
 
-const static char* COLOR_LABELS[5] = { "RED", "BLUE", "YELLOW", "GREEN", "CYAN" };
+const static char* COLOR_LABELS[8] = { "RED", "BLUE", "YELLOW", "GREEN", "CYAN", "BLACK", "WHITE", "SILVER" };
 const static char* DIP_DIFFICULTY[4] = { "EASY", "NORMAL", "HARD", "HARDEST" };
 const static char* GEAR_LABELS[4] = {"MANUAL", "MANUAL CABINET", "MANUAL 2 BUTTONS", "AUTOMATIC"};
 const static char* FPS_LABELS[3] = { "30 FPS", "ORIGINAL", "60 FPS" };

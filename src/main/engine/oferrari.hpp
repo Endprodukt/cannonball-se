@@ -48,6 +48,9 @@ public:
     const static uint16_t PAL_YELLOW = 261;
     const static uint16_t PAL_GREEN = 266;
     const static uint16_t PAL_CYAN = 271;
+    const static uint16_t PAL_BLACK = 276;
+    const static uint16_t PAL_WHITE = 281;
+    const static uint16_t PAL_SILVER = 286;
 
 	// -------------------------------------------------------------------------
 	// Main Switch Variables
@@ -227,6 +230,7 @@ public:
     void do_sound_score_slip();
     void shake();
     void do_skid();
+    void cycle_car_palette();
     
 private:
     // Max speed of car
@@ -235,7 +239,7 @@ private:
     // Car Base Increment, For Movement
     const static uint32_t CAR_BASE_INC = 0x12F;
 
-    // Maximum distance to allow car to stray from road
+    // Maximum distance to allow car to stray from sides of road
     const static uint16_t OFFROAD_BOUNDS = 0x1F4;
 
     // Used by set_car_x
@@ -287,6 +291,7 @@ private:
     static uint16_t torque_lookup[];
     static const uint8_t rev_inc_lookup[];
 
+    void tick_base();
     void logic();
     void ferrari_normal();
     void setup_ferrari_sprite();

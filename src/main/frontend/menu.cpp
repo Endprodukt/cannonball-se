@@ -316,6 +316,23 @@ bool Menu::select_pressed()
         }
     }
 
+    if (menu_selected == &menu_handling &&
+        cursor >= 0 &&
+        cursor < static_cast<int>(menu_handling.size()))
+    {
+        const std::string& option = menu_handling[cursor];
+
+        if (starts_with_label(option, ENTRY_COLOR))
+        {
+            config.engine.car_pal++;
+            if (config.engine.car_pal > 7)
+                config.engine.car_pal = 0;
+
+            refresh_menu();
+            return false;
+        }
+    }
+
     if (menu_selected == &menu_controls &&
         cursor >= 0 &&
         cursor < static_cast<int>(menu_controls.size()))

@@ -190,6 +190,7 @@ inline void HWRoad::export_background_layer()
 // parsed, so they redirect only the calls that follow in Video::prepare_frame().
 #include "texture_replacement_capture.hpp"
 #include "compact_tilemap.hpp"
+#include "tilemap_export_dedup.hpp"
 
 // HWRoad's replacement selector is a member-function pointer stored in the
 // hardware object. hwroad.cpp sees only the declaration of the inline wrapper,
@@ -199,7 +200,7 @@ inline void HWRoad::export_background_layer()
 static void (HWRoad::* volatile force_road_replacement_wrapper_linkage)(uint16_t*) =
     &HWRoad::render_background_replacement_wrapper;
 
-#define export_composite_layers export_compact_layers
+#define export_composite_layers export_deduplicated_layers
 #define render_background render_background_with_replacements
 #define render_tile_layer render_tile_layer_with_compact_replacements
 #define render_text_layer render_text_layer_with_replacements

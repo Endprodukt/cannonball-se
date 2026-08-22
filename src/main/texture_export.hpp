@@ -603,8 +603,7 @@ inline void hwtiles::export_composite_layers()
         };
 
         uint32_t graphics_hash = 2166136261u;
-        graphics_hash = texture_export::fnv1a_bytes(
-            reinterpret_cast<const uint8_t*>(&page_select), sizeof(page_select), graphics_hash);
+        graphics_hash = texture_export::fnv1a_word(graphics_hash, page_select);
         graphics_hash = texture_export::fnv1a_bytes(tile_banks, sizeof(tile_banks), graphics_hash);
 
         for (uint8_t page_id : selected_pages)
@@ -668,6 +667,12 @@ inline void hwtiles::export_composite_layers()
                     const uint16_t data = static_cast<uint16_t>(
                         (static_cast<uint16_t>(tile_ram[tile_index]) << 8) |
                         tile_ram[tile_index + 1]);
+
+                    // Match the native frame pipeline. These two scrolling
+                    // tilemap passes currently draw priority 0 only; priority 1
+                    // entries must not leak into an exported replacement source.
+                    if ((data & 0x8000u) != 0)
+                        continue;
 
                     uint32_t code = data & 0x1FFFu;
                     code = (static_cast<uint32_t>(tile_banks[code >> 12]) << 12) |

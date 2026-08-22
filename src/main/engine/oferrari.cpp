@@ -2,11 +2,12 @@
     Ferrari palette extensions for CannonBall-SE.
 
     The original Ferrari implementation is kept verbatim in oferrari_base.cpp.
-    This wrapper only extends its palette list and wraps tick() so F10 can
-    cycle the selected colour immediately while the game is running.
+    This wrapper extends its palette list and handles live F10 colour cycling
+    during normal Ferrari updates. Attract mode shares the same edge state via
+    car_palette_hotkey.hpp so the key can also be handled there safely.
 ***************************************************************************/
 
-#include <SDL.h>
+#include "engine/car_palette_hotkey.hpp"
 
 // Pre-include the original implementation's dependencies so the temporary
 // macros below only affect tokens in oferrari_base.cpp itself.
@@ -46,15 +47,8 @@ void OFerrari::cycle_car_palette()
 
 void OFerrari::tick()
 {
-    static bool f10_was_down = false;
-
-    const Uint8* keyboard_state = SDL_GetKeyboardState(nullptr);
-    const bool f10_down =
-        keyboard_state && keyboard_state[SDL_SCANCODE_F10] != 0;
-
-    if (f10_down && !f10_was_down)
+    if (car_palette_hotkey::pressed())
         cycle_car_palette();
 
-    f10_was_down = f10_down;
     tick_base();
 }

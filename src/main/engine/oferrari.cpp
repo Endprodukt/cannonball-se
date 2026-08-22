@@ -43,11 +43,6 @@ void OFerrari::cycle_car_palette()
         config.engine.car_pal = 0;
 
     ferrari_pal = FERRARI_PALETTES[config.engine.car_pal];
-
-    // F10 in attract mode is the user's persistent default colour choice.
-    // Normal in-race cycling remains temporary and does not rewrite config.xml.
-    if (outrun.game_state == GS_ATTRACT)
-        config.save();
 }
 
 void OFerrari::tick()

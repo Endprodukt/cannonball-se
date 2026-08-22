@@ -17,6 +17,7 @@ public:
     uint8_t read(const uint16_t adr);
     void write(const uint16_t adr, const uint16_t data);
     void render(uint16_t* pixels, const uint8_t);
+    void render_with_replacements(uint16_t* pixels, const uint8_t);
 
     // Development exporter. Kept separate from the normal sprite renderer so
     // export logic can be removed again without touching emulation behaviour.

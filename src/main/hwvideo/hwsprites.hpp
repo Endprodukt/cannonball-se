@@ -18,6 +18,21 @@ public:
     void write(const uint16_t adr, const uint16_t data);
     void render(uint16_t* pixels, const uint8_t);
 
+    // Development exporter. Kept separate from the normal sprite renderer so
+    // export logic can be removed again without touching emulation behaviour.
+    void export_visible_sprites();
+
+    // Return one decoded 32-bit sprite-ROM word for the PNG exporter.
+    uint32_t export_read_sprite_word(uint32_t bank, uint32_t address) const
+    {
+        const uint32_t numbanks = SPRITES_LENGTH / 0x10000;
+        if (numbanks == 0 || address >= 0x10000)
+            return 0;
+
+        bank %= numbanks;
+        return sprites[(0x10000 * bank) + address];
+    }
+
     std::chrono::nanoseconds setup{}; //initialises to zero
     std::chrono::nanoseconds draw[16]{};
 

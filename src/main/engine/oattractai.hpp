@@ -48,8 +48,10 @@ public:
 
     void init();
     void tick_ai_enhanced();
+    void tick_ai_enhanced_base();
 
     void tick_ai();
+    void tick_ai_base();
     void check_road_bonus();
     void set_steering_bonus();
 

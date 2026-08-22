@@ -48,6 +48,16 @@ void OFerrari::cycle_car_palette()
 
 void OFerrari::tick()
 {
+    // Once the game has returned to the attract/front-end sequence, discard
+    // any temporary Music Select/race colour and restore the saved default.
+    if (outrun.game_state >= GS_INIT && outrun.game_state <= GS_LOGO)
+    {
+        const int color =
+            car_palette_state::get_default(config.engine.car_pal);
+        config.engine.car_pal = color;
+        ferrari_pal = car_palette_state::palette_source(color);
+    }
+
     if (car_palette_hotkey::pressed())
     {
         cycle_car_palette();

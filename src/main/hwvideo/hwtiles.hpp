@@ -30,6 +30,10 @@ public:
     void render_text_layer(uint16_t*, uint8_t);
     void render_all_tiles(uint16_t*);
 
+    // Development exporter: writes assembled 1024x512 tilemap layers rather
+    // than individual 8x8 tiles.
+    void export_composite_layers();
+
 private:
     int16_t x_clamp;
 

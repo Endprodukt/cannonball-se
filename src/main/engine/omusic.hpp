@@ -21,10 +21,13 @@ public:
 
     bool load_widescreen_map(std::string path);
     void enable();
+    void enable_base();
     void disable();
     void tick();
+    void tick_base();
     void blit();
     void check_start();
+    void check_start_base();
     void play_music(int index = -1);
     void cycle_music();
 

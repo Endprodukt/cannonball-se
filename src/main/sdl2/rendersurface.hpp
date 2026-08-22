@@ -17,7 +17,7 @@
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
-#include "gl_backend.hpp"   // tiny ES2 backend
+#include "gl_backend_replacements.hpp"   // GLES backend + external texture replacements
 
 class RenderSurface : public RenderBase
 {

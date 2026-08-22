@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <iomanip>
@@ -11,6 +12,7 @@
 
 #include "frontend/config.hpp"
 #include "globals.hpp"
+#include "sdl2/pixel_scaler_state.hpp"
 #include "texture_export.hpp"
 #include "texture_replacement_frame.hpp"
 
@@ -18,6 +20,12 @@ namespace texture_replacement
 {
     inline texture_replacement_frame::Frame pending_frame;
     inline bool pending_frame_active = false;
+
+    inline bool supported_by_current_renderer()
+    {
+        return !pixel_scaler::active(
+            pixel_scaler::mode.load(std::memory_order_relaxed));
+    }
 
     inline void begin_frame()
     {
@@ -82,7 +90,6 @@ namespace texture_replacement
     }
 
     inline bool prepare_road_background(
-        const HWRoad& road,
         texture_replacement_frame::DrawCommand& command,
         const uint16_t* restore_pixels,
         const uint16_t* ramBuff,
@@ -206,11 +213,19 @@ namespace texture_replacement
 
 inline void HWRoad::render_background_replacement_wrapper(uint16_t* buf)
 {
+    if (!texture_replacement::supported_by_current_renderer())
+    {
+        texture_replacement::pending_frame_active = false;
+        texture_replacement::pending_frame = {};
+        texture_replacement_frame::reset();
+        (this->*render_background)(buf);
+        return;
+    }
+
     texture_replacement::begin_frame();
 
     texture_replacement_frame::DrawCommand command;
     const bool replacement = texture_replacement::prepare_road_background(
-        *this,
         command,
         buf,
         ramBuff,

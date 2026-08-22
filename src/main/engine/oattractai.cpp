@@ -28,14 +28,7 @@ namespace
     inline void handle_attract_palette_hotkey()
     {
         if (car_palette_hotkey::pressed())
-        {
             oferrari.cycle_car_palette();
-
-            // F10 in attract mode changes the user's persistent default colour.
-            // Save at the exact handler that receives the working attract input,
-            // rather than relying on the normal Ferrari tick path.
-            config.save();
-        }
     }
 }
 

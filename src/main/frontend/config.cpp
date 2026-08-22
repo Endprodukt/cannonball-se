@@ -24,6 +24,7 @@
 #include "config.hpp"
 #include "globals.hpp"
 #include "../utils.hpp"
+#include "engine/car_palette_state.hpp"
 #include "engine/ohiscore.hpp"
 #include "engine/outils.hpp"
 #include "engine/audio/osoundint.hpp"
@@ -245,6 +246,12 @@ void Config::load()
 {
     load_base();
 
+    // engine.car_pal remains the live/runtime Ferrari colour. Keep a separate
+    // persistent default so Music Select can change the race colour without
+    // ever overwriting the user's attract/default colour.
+    car_palette_state::initialize(engine.car_pal);
+    engine.car_pal = car_palette_state::get_default(engine.car_pal);
+
     int scaler_mode = cfg.get_int("video.pixel_scaler", pixel_scaler::OFF);
     int scaler_last = cfg.get_int("video.pixel_scaler_last", pixel_scaler::XBRZ_4X);
 
@@ -321,5 +328,13 @@ bool Config::save()
         "controls.device_bindings",
         encode_device_bindings(controls.device_bindings));
 
-    return save_base();
+    // config_base.cpp persists engine.car_pal as engine.car_color. Temporarily
+    // substitute the persistent attract/default colour so a Music Select or
+    // in-race colour can never leak into config.xml.
+    const int runtime_car_pal = engine.car_pal;
+    engine.car_pal = car_palette_state::get_default(runtime_car_pal);
+    const bool saved = save_base();
+    engine.car_pal = runtime_car_pal;
+
+    return saved;
 }

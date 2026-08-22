@@ -1,4 +1,3 @@
 .vs/
 build/
-sprite_export/
-background_export/
+texture_export/

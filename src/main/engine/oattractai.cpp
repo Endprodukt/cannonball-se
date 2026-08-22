@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "engine/car_palette_hotkey.hpp"
+#include "engine/car_palette_state.hpp"
 #include "engine/oattractai.hpp"
 #include "engine/oferrari.hpp"
 #include "engine/oinputs.hpp"
@@ -25,21 +26,37 @@
 
 namespace
 {
+    inline void restore_attract_default_palette()
+    {
+        const int color =
+            car_palette_state::get_default(config.engine.car_pal);
+
+        config.engine.car_pal = color;
+        oferrari.ferrari_pal = car_palette_state::palette_source(color);
+    }
+
     inline void handle_attract_palette_hotkey()
     {
         if (car_palette_hotkey::pressed())
+        {
             oferrari.cycle_car_palette();
+            car_palette_state::set_default(config.engine.car_pal);
+            config.save();
+        }
     }
 }
 
 void OAttractAI::tick_ai_enhanced()
 {
+    // Any temporary Music Select/race colour ends when attract driving resumes.
+    restore_attract_default_palette();
     handle_attract_palette_hotkey();
     tick_ai_enhanced_base();
 }
 
 void OAttractAI::tick_ai()
 {
+    restore_attract_default_palette();
     handle_attract_palette_hotkey();
     tick_ai_base();
 }

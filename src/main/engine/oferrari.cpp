@@ -43,6 +43,11 @@ void OFerrari::cycle_car_palette()
         config.engine.car_pal = 0;
 
     ferrari_pal = FERRARI_PALETTES[config.engine.car_pal];
+
+    // A live F10 colour change becomes the new default immediately. Keeping
+    // persistence here avoids any dependency on which attract/game update path
+    // consumes the shared F10 edge first.
+    config.save();
 }
 
 void OFerrari::tick()

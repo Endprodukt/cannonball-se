@@ -8,6 +8,7 @@
 ***************************************************************************/
 
 #include "engine/car_palette_hotkey.hpp"
+#include "engine/car_palette_state.hpp"
 
 // Pre-include the original implementation's dependencies so the temporary
 // macros below only affect tokens in oferrari_base.cpp itself.
@@ -43,17 +44,22 @@ void OFerrari::cycle_car_palette()
         config.engine.car_pal = 0;
 
     ferrari_pal = FERRARI_PALETTES[config.engine.car_pal];
-
-    // A live F10 colour change becomes the new default immediately. Keeping
-    // persistence here avoids any dependency on which attract/game update path
-    // consumes the shared F10 edge first.
-    config.save();
 }
 
 void OFerrari::tick()
 {
     if (car_palette_hotkey::pressed())
+    {
         cycle_car_palette();
+
+        // Only F10 changes made while the actual attract drive is running
+        // become the persistent default. In-game F10 changes stay temporary.
+        if (outrun.game_state == GS_ATTRACT)
+        {
+            car_palette_state::set_default(config.engine.car_pal);
+            config.save();
+        }
+    }
 
     tick_base();
 }

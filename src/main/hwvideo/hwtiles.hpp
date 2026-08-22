@@ -34,6 +34,11 @@ public:
     // than individual 8x8 tiles.
     void export_composite_layers();
 
+    // Development replacement wrappers. video.cpp calls these through macros
+    // defined only after the original class declarations are complete.
+    void render_tile_layer_with_replacements(uint16_t*, uint8_t, uint8_t);
+    void render_text_layer_with_replacements(uint16_t*, uint8_t);
+
 private:
     int16_t x_clamp;
 

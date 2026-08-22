@@ -170,9 +170,9 @@ namespace
 
         if (!music_color_initialized)
         {
-            // Every new arcade Music Select starts from the canonical red
-            // Ferrari. Shifter changes are deliberately per-run choices.
-            config.engine.car_pal = 0;
+            // Start from the persisted Ferrari colour. F10 in attract mode
+            // updates this default, while the shifter can still make a
+            // temporary per-run choice on the Music Select screen.
             music_color_initialized = true;
         }
     }
@@ -298,9 +298,8 @@ void OOutputs::writeDigitalToConsole()
     // this method is already called every engine tick by main.cpp.
     sync_continuous_traffic_to_difficulty();
 
-    // New runs still begin from the red Ferrari, then allow a temporary colour
-    // choice with the shifter. Attract mode now keeps the currently selected
-    // palette so F10 colour cycling remains visible throughout the demo.
+    // Keep the persisted default Ferrari colour when Music Select opens.
+    // The player can still override it for the next run with the shifter.
     sync_music_car_color(music_selection);
 
     // Draw the car-colour instruction and queue the small map Ferrari preview.

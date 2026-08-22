@@ -6,7 +6,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -20,6 +23,11 @@ namespace texture_replacement
 {
     inline texture_replacement_frame::Frame pending_frame;
     inline bool pending_frame_active = false;
+
+    // Missing exact palette variants are resolved once per run to another PNG
+    // with the same stable graphics identity. This prevents palette animation or
+    // fades from alternating between the HD texture and the original artwork.
+    inline std::unordered_map<std::string, std::string> stable_path_cache;
 
     inline bool supported_by_current_renderer()
     {
@@ -35,50 +43,164 @@ namespace texture_replacement
         pending_frame_active = true;
     }
 
+    inline std::string resolve_palette_variant(
+        const std::filesystem::path& exact_path,
+        const std::string& stable_filename_prefix,
+        const std::string& required_suffix = {})
+    {
+        if (texture_replacement_frame::replacement_exists(exact_path.string()))
+            return exact_path.string();
+
+        const std::string cache_key =
+            (exact_path.parent_path() / stable_filename_prefix).string() +
+            "|" + required_suffix;
+        const auto cached = stable_path_cache.find(cache_key);
+        if (cached != stable_path_cache.end())
+            return cached->second;
+
+        std::string resolved;
+        std::error_code ec;
+        const std::filesystem::path directory = exact_path.parent_path();
+        if (std::filesystem::is_directory(directory, ec) && !ec)
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(directory, ec))
+            {
+                if (ec || !entry.is_regular_file())
+                    continue;
+
+                const std::string name = entry.path().filename().string();
+                if (!name.starts_with(stable_filename_prefix) ||
+                    entry.path().extension() != ".png")
+                {
+                    continue;
+                }
+
+                if (!required_suffix.empty())
+                {
+                    if (!name.ends_with(required_suffix + ".png"))
+                        continue;
+                }
+                else if (name.find("_shadow.png") != std::string::npos)
+                {
+                    continue;
+                }
+
+                if (resolved.empty() || entry.path().string() < resolved)
+                    resolved = entry.path().string();
+            }
+        }
+
+        stable_path_cache.emplace(cache_key, resolved);
+        if (!resolved.empty())
+        {
+            std::cout << "Using stable texture replacement across palette variants: "
+                      << resolved << "\n";
+        }
+        return resolved;
+    }
+
     inline void finalize_and_publish(uint16_t* final_pixels)
     {
         if (!pending_frame_active || !final_pixels)
             return;
 
-        const size_t frame_pixels =
-            static_cast<size_t>(pending_frame.logical_width) *
-            pending_frame.logical_height;
+        const int frame_width = pending_frame.logical_width;
+        const int frame_height = pending_frame.logical_height;
 
-        // Capture visibility from the untouched final native frame first.
+        // Capture all ownership masks from the untouched final native frame.
+        // Commands may be full-screen layers or small sprite rectangles.
         for (auto& command : pending_frame.commands)
         {
-            if (command.width != pending_frame.logical_width ||
-                command.height != pending_frame.logical_height ||
-                command.expected_pixels.size() != frame_pixels ||
-                command.restore_pixels.size() != frame_pixels)
+            if (command.width <= 0 || command.height <= 0)
             {
                 command.visibility_mask.clear();
                 continue;
             }
 
-            command.visibility_mask.assign(frame_pixels, 0);
-            for (size_t i = 0; i < frame_pixels; ++i)
+            const size_t command_pixels =
+                static_cast<size_t>(command.width) * command.height;
+            if (command.restore_pixels.size() != command_pixels ||
+                (!command.sprite_palette_ownership &&
+                 command.expected_pixels.size() != command_pixels))
             {
-                const uint16_t expected = command.expected_pixels[i];
-                if (expected != 0xffffu && final_pixels[i] == expected)
-                    command.visibility_mask[i] = 255;
+                command.visibility_mask.clear();
+                continue;
+            }
+
+            command.visibility_mask.assign(command_pixels, 0);
+
+            for (int local_y = 0; local_y < command.height; ++local_y)
+            {
+                const int screen_y = command.y + local_y;
+                if (screen_y < 0 || screen_y >= frame_height)
+                    continue;
+
+                for (int local_x = 0; local_x < command.width; ++local_x)
+                {
+                    const int screen_x = command.x + local_x;
+                    if (screen_x < 0 || screen_x >= frame_width)
+                        continue;
+
+                    const size_t local_index =
+                        static_cast<size_t>(local_y) * command.width + local_x;
+                    const size_t screen_index =
+                        static_cast<size_t>(screen_y) * frame_width + screen_x;
+                    const uint16_t indexed = final_pixels[screen_index];
+
+                    bool visible = false;
+                    if (command.sprite_palette_ownership)
+                    {
+                        visible =
+                            (indexed & 0x0ff0u) == command.sprite_palette_base;
+                        if (command.sprite_shadow && (indexed & 0x1000u) != 0)
+                            visible = true;
+                    }
+                    else
+                    {
+                        const uint16_t expected = command.expected_pixels[local_index];
+                        visible = expected != 0xffffu && indexed == expected;
+                    }
+
+                    if (visible)
+                        command.visibility_mask[local_index] = 255;
+                }
             }
         }
 
-        // Remove only original pixels that still belong to a replacement. This
-        // reveals the exact lower native layer underneath transparent HD pixels.
+        // Remove only original pixels that are still owned by each replacement.
+        // Later native layers remain untouched because their ownership mask is 0.
         for (const auto& command : pending_frame.commands)
         {
-            if (command.visibility_mask.size() != frame_pixels ||
-                command.restore_pixels.size() != frame_pixels)
+            const size_t command_pixels =
+                static_cast<size_t>(std::max(0, command.width)) *
+                static_cast<size_t>(std::max(0, command.height));
+            if (command.visibility_mask.size() != command_pixels ||
+                command.restore_pixels.size() != command_pixels)
             {
                 continue;
             }
 
-            for (size_t i = 0; i < frame_pixels; ++i)
+            for (int local_y = 0; local_y < command.height; ++local_y)
             {
-                if (command.visibility_mask[i] != 0)
-                    final_pixels[i] = command.restore_pixels[i];
+                const int screen_y = command.y + local_y;
+                if (screen_y < 0 || screen_y >= frame_height)
+                    continue;
+
+                for (int local_x = 0; local_x < command.width; ++local_x)
+                {
+                    const int screen_x = command.x + local_x;
+                    if (screen_x < 0 || screen_x >= frame_width)
+                        continue;
+
+                    const size_t local_index =
+                        static_cast<size_t>(local_y) * command.width + local_x;
+                    if (command.visibility_mask[local_index] == 0)
+                        continue;
+
+                    const size_t screen_index =
+                        static_cast<size_t>(screen_y) * frame_width + screen_x;
+                    final_pixels[screen_index] = command.restore_pixels[local_index];
+                }
             }
         }
 
@@ -163,10 +285,18 @@ namespace texture_replacement
             << graphics_hash
             << "_pal" << std::setw(8) << palette_hash;
 
-        const std::filesystem::path path =
-            std::filesystem::path("textures") / (key.str() + ".png");
+        std::ostringstream stable_prefix;
+        stable_prefix << "road_background"
+                      << "_w" << export_width
+                      << "_g" << std::hex << std::setfill('0') << std::setw(8)
+                      << graphics_hash
+                      << "_pal";
 
-        if (!texture_replacement_frame::replacement_exists(path.string()))
+        const std::filesystem::path exact_path =
+            std::filesystem::path("textures") / (key.str() + ".png");
+        const std::string resolved_path = resolve_palette_variant(
+            exact_path, stable_prefix.str());
+        if (resolved_path.empty())
             return false;
 
         const int logical_width = config.s16_width;
@@ -176,17 +306,14 @@ namespace texture_replacement
             static_cast<size_t>(logical_width) * logical_height;
 
         command = {};
-        command.path = path.string();
+        command.path = resolved_path;
         command.width = logical_width;
         command.height = logical_height;
         command.base_texture_width = export_width;
         command.base_texture_height = export_height;
         command.expected_pixels.assign(frame_pixels, 0xffffu);
-        // The road background is the bottom-most layer. Transparent pixels in a
-        // replacement should reveal black, never stale contents from a previous frame.
         command.restore_pixels.assign(frame_pixels, 0u);
 
-        // 21:9 stretches a centred strip of the completed road/tile background.
         if (config.video.widescreen == 2 && logical_width > 0)
         {
             const int overscan = 20 * scale;
@@ -240,186 +367,14 @@ inline void HWRoad::render_background_replacement_wrapper(uint16_t* buf)
             std::move(command));
 }
 
+// Legacy full-map wrapper retained for source compatibility. The active branch
+// redirects Video::prepare_frame() to the compact wrapper in compact_tilemap.hpp.
 inline void hwtiles::render_tile_layer_with_replacements(
     uint16_t* buf,
     uint8_t page_index,
     uint8_t priority_draw)
 {
-    // Only the large native background tilemap is wired for this first test.
-    if (page_index != 1 || priority_draw != 0 ||
-        !texture_replacement::pending_frame_active)
-    {
-        render_tile_layer(buf, page_index, priority_draw);
-        return;
-    }
-
-    constexpr uint32_t MAP_WIDTH = 1024;
-    constexpr uint32_t MAP_HEIGHT = 512;
-
-    const uint16_t page_select = page[page_index];
-    const std::array<uint8_t, 4> selected_pages = {
-        static_cast<uint8_t>((page_select >> 0) & 0x0F),
-        static_cast<uint8_t>((page_select >> 4) & 0x0F),
-        static_cast<uint8_t>((page_select >> 8) & 0x0F),
-        static_cast<uint8_t>((page_select >> 12) & 0x0F)
-    };
-
-    uint32_t palette_hash = 2166136261u;
-    for (uint32_t colour = 0; colour < 128; ++colour)
-    {
-        for (uint32_t pixel = 0; pixel < 8; ++pixel)
-        {
-            const uint16_t word =
-                video.read_pal16(((colour << 3) + pixel) * 2);
-            palette_hash = texture_export::fnv1a_word(palette_hash, word);
-        }
-    }
-
-    uint32_t graphics_hash = 2166136261u;
-    graphics_hash = texture_export::fnv1a_word(graphics_hash, page_select);
-    graphics_hash = texture_export::fnv1a_bytes(
-        tile_banks, sizeof(tile_banks), graphics_hash);
-
-    for (uint8_t page_id : selected_pages)
-    {
-        const size_t page_offset = static_cast<size_t>(page_id) << 12;
-        graphics_hash = texture_export::fnv1a_bytes(
-            tile_ram + page_offset, 0x1000, graphics_hash);
-    }
-
-    std::ostringstream key;
-    key << "background"
-        << "_pages" << std::hex << std::setfill('0') << std::setw(4)
-        << page_select
-        << "_g" << std::setw(8) << graphics_hash
-        << "_pal" << std::setw(8) << palette_hash;
-
-    const std::filesystem::path path =
-        std::filesystem::path("textures") / (key.str() + ".png");
-
-    if (!texture_replacement_frame::replacement_exists(path.string()))
-    {
-        render_tile_layer(buf, page_index, priority_draw);
-        return;
-    }
-
-    uint16_t xScroll = scroll_x[page_index];
-    uint16_t yScroll = scroll_y[page_index];
-
-    // Match the current native renderer: it resolves the first row/column entry
-    // once for the whole pass when those scroll modes are enabled.
-    if ((xScroll & 0x8000) != 0)
-        xScroll = (text_ram[0xf80 + (0x40 * page_index) + 0] << 8) |
-                  text_ram[0xf80 + (0x40 * page_index) + 1];
-    if ((yScroll & 0x8000) != 0)
-        yScroll = (text_ram[0xf16 + (0x40 * page_index) + 0] << 8) |
-                  text_ram[0xf16 + (0x40 * page_index) + 1];
-
-    const int x_decrement = (x_clamp - xScroll) & 0x3ff;
-    const int y_decrement = yScroll & 0x1ff;
-    const int logical_width = config.s16_width;
-    const int logical_height = config.s16_height;
-    const int scale = config.video.hires ? 2 : 1;
-    const size_t frame_pixels =
-        static_cast<size_t>(logical_width) * logical_height;
-
-    texture_replacement_frame::DrawCommand command;
-    command.path = path.string();
-    command.width = logical_width;
-    command.height = logical_height;
-    command.base_texture_width = MAP_WIDTH;
-    command.base_texture_height = MAP_HEIGHT;
-    command.repeat = true;
-    command.expected_pixels.assign(frame_pixels, 0xffffu);
-    command.restore_pixels.assign(buf, buf + frame_pixels);
-
-    int source_left_internal = 0;
-    int source_width_internal = logical_width;
-    if (config.video.widescreen == 2 && s16_width_noscale > 512)
-    {
-        const int overscan = 20 * scale;
-        source_left_internal = overscan;
-        source_width_internal = logical_width - (overscan << 1);
-    }
-
-    const float native_left =
-        static_cast<float>(source_left_internal) / scale;
-    const float native_span =
-        static_cast<float>(source_width_internal) / scale;
-
-    command.u0 = (x_decrement + native_left) /
-                 static_cast<float>(MAP_WIDTH);
-    command.u1 = (x_decrement + native_left + native_span) /
-                 static_cast<float>(MAP_WIDTH);
-    command.v0 = y_decrement / static_cast<float>(MAP_HEIGHT);
-    command.v1 = (y_decrement +
-        (logical_height / static_cast<float>(scale))) /
-        static_cast<float>(MAP_HEIGHT);
-
-    for (int screen_y = 0; screen_y < logical_height; ++screen_y)
-    {
-        const int native_y = screen_y / scale;
-        const uint32_t map_y =
-            static_cast<uint32_t>(native_y + y_decrement) & 0x1ffu;
-
-        for (int screen_x = 0; screen_x < logical_width; ++screen_x)
-        {
-            int source_x_internal = screen_x;
-            if (config.video.widescreen == 2 &&
-                s16_width_noscale > 512 && logical_width > 1)
-            {
-                source_x_internal = source_left_internal +
-                    ((source_width_internal - 1) * screen_x) /
-                    (logical_width - 1);
-            }
-
-            const int native_x = source_x_internal / scale;
-            const uint32_t map_x =
-                static_cast<uint32_t>(native_x + x_decrement) & 0x3ffu;
-
-            const uint32_t mx = map_x >> 3;
-            const uint32_t my = map_y >> 3;
-            const uint32_t quad =
-                ((my >= 32u) ? 2u : 0u) |
-                ((mx >= 64u) ? 1u : 0u);
-
-            const uint8_t page_id = selected_pages[quad];
-            const uint32_t tile_index =
-                (static_cast<uint32_t>(page_id) << 12) |
-                ((my & 31u) << 7) |
-                ((mx & 63u) << 1);
-
-            const uint16_t data = static_cast<uint16_t>(
-                (static_cast<uint16_t>(tile_ram[tile_index]) << 8) |
-                tile_ram[tile_index + 1]);
-
-            if ((data & 0x8000u) != 0)
-                continue;
-
-            uint32_t code = data & 0x1fffu;
-            code = (static_cast<uint32_t>(tile_banks[code >> 12]) << 12) |
-                   (code & 0x0fffu);
-            code &= (NUM_TILES - 1);
-            if (code == 0)
-                continue;
-
-            const uint32_t row = tiles[(code << 3) + (map_y & 7u)];
-            const uint8_t pixel = static_cast<uint8_t>(
-                (row >> (28 - ((map_x & 7u) * 4))) & 0x0fu);
-            if (pixel == 0)
-                continue;
-
-            const uint16_t colour =
-                static_cast<uint16_t>((data >> 6) & 0x7fu);
-            command.expected_pixels[
-                static_cast<size_t>(screen_y) * logical_width + screen_x] =
-                    static_cast<uint16_t>((colour << 3) + pixel);
-        }
-    }
-
     render_tile_layer(buf, page_index, priority_draw);
-    texture_replacement::pending_frame.commands.push_back(
-        std::move(command));
 }
 
 inline void hwtiles::render_text_layer_with_replacements(
@@ -428,7 +383,6 @@ inline void hwtiles::render_text_layer_with_replacements(
 {
     render_text_layer(buf, priority_draw);
 
-    // This is the final native layer in Video::prepare_frame().
     if (priority_draw == 1)
         texture_replacement::finalize_and_publish(buf);
 }

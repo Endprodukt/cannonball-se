@@ -189,6 +189,7 @@ inline void HWRoad::export_background_layer()
 // here, after video.hpp and all hardware class declarations have been parsed.
 // They therefore redirect only the calls that follow in Video::prepare_frame().
 #include "texture_replacement_capture.hpp"
+#include "compact_tilemap.hpp"
 #define render_background render_background_with_replacements
-#define render_tile_layer render_tile_layer_with_replacements
+#define render_tile_layer render_tile_layer_with_compact_replacements
 #define render_text_layer render_text_layer_with_replacements

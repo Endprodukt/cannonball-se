@@ -8,6 +8,7 @@
 ***************************************************************************/
 
 #include "main.hpp"
+#include "engine/car_palette_state.hpp"
 #include "engine/oferrari.hpp"
 #include "engine/ohud.hpp"
 #include "engine/oinputs.hpp"
@@ -19,9 +20,11 @@
 #include "frontend/menu.hpp"
 #include "directx/ffeedback.hpp"
 
+#define enable enable_base
 #define check_start check_start_base
 #include "omusic_palette_base.cpp"
 #undef check_start
+#undef enable
 
 namespace
 {
@@ -35,6 +38,22 @@ namespace
             color -= CAR_COLOR_COUNT;
         return color;
     }
+}
+
+void OMusic::enable()
+{
+    // A fresh Music Select always starts from the persistent attract/default
+    // colour. The shifter may then choose a temporary colour for this race.
+    // The second Time Trial handoff is the same race, so preserve its already
+    // selected temporary colour when returning from course selection.
+    if (!(return_from_time_trial &&
+          outrun.cannonball_mode == Outrun::MODE_TTRIAL))
+    {
+        config.engine.car_pal =
+            car_palette_state::get_default(config.engine.car_pal);
+    }
+
+    enable_base();
 }
 
 void OMusic::check_start()
@@ -84,8 +103,8 @@ void OMusic::check_start()
             wrap_car_color(old_color + color_direction);
 
         // The preserved five-colour routine may already have saved on START.
-        // If a colour shift and START happened on the same frame, overwrite
-        // that save with the corrected eight-colour value.
+        // Config::save() now always persists the separate attract/default
+        // colour, so this correction remains race-only even on the START frame.
         if (save_after_correction)
             config.save();
     }

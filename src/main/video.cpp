@@ -29,6 +29,7 @@
 #include "frontend/config.hpp"
 #include "engine/oroad.hpp"
 #include "texture_export.hpp"
+#include "road_background_export.hpp"
 
 #include "sdl2/pixelscaler_renderer.hpp"
 
@@ -199,6 +200,7 @@ void Video::prepare_frame()
         // OutRun Hardware Video Emulation
         tile_layer->update_tile_values();
         tile_layer->export_composite_layers();
+        hwroad.export_background_layer();
 
         (hwroad.*hwroad.render_background)(pixels);
         tile_layer->render_tile_layer(pixels, 1, 0);      // background layer
@@ -583,7 +585,7 @@ uint32_t Video::read_pal32(uint32_t* palAddr)
 /*
 uint32_t Video::read_pal32(uint32_t* palAddr)
 {
-    uint32_t adr = *palAddr & (0x1fff - 3); // 0x1fff - 3 = 8188;
+    uint32_t adr = (*palAddr) & (0x1fff - 3); // 0x1fff - 3 = 8188;
     *palAddr += 4;
     return (palette[adr] << 24) | (palette[adr+1] << 16) | (palette[adr+2] << 8) | palette[adr+3];
 }

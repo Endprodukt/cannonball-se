@@ -182,8 +182,9 @@ namespace texture_replacement
         command.base_texture_width = export_width;
         command.base_texture_height = export_height;
         command.expected_pixels.assign(frame_pixels, 0xffffu);
-        command.restore_pixels.assign(
-            restore_pixels, restore_pixels + frame_pixels);
+        // The road background is the bottom-most layer. Transparent pixels in a
+        // replacement should reveal black, never stale contents from a previous frame.
+        command.restore_pixels.assign(frame_pixels, 0u);
 
         // 21:9 stretches a centred strip of the completed road/tile background.
         if (config.video.widescreen == 2 && logical_width > 0)

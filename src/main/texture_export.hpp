@@ -439,10 +439,10 @@ inline void hwsprites::export_visible_sprites()
     if (!export_dir_ready)
     {
         std::error_code ec;
-        std::filesystem::create_directories("sprite_export", ec);
+        std::filesystem::create_directories("texture_export", ec);
         if (ec)
         {
-            std::cerr << "Unable to create sprite_export directory: " << ec.message() << "\n";
+            std::cerr << "Unable to create texture_export directory: " << ec.message() << "\n";
             return;
         }
         export_dir_ready = true;
@@ -499,7 +499,7 @@ inline void hwsprites::export_visible_sprites()
             continue;
 
         const std::filesystem::path filename =
-            std::filesystem::path("sprite_export") / ("spr_" + key + ".png");
+            std::filesystem::path("texture_export") / ("spr_" + key + ".png");
         if (std::filesystem::exists(filename))
             continue;
 
@@ -519,7 +519,7 @@ inline void hwsprites::export_visible_sprites()
         }
 
         const std::filesystem::path manifest_path =
-            std::filesystem::path("sprite_export") / "manifest.csv";
+            std::filesystem::path("texture_export") / "sprite_manifest.csv";
         const bool new_manifest =
             !std::filesystem::exists(manifest_path) ||
             std::filesystem::file_size(manifest_path) == 0;
@@ -567,10 +567,10 @@ inline void hwtiles::export_composite_layers()
     if (!export_dir_ready)
     {
         std::error_code ec;
-        std::filesystem::create_directories("background_export", ec);
+        std::filesystem::create_directories("texture_export", ec);
         if (ec)
         {
-            std::cerr << "Unable to create background_export directory: " << ec.message() << "\n";
+            std::cerr << "Unable to create texture_export directory: " << ec.message() << "\n";
             return;
         }
         export_dir_ready = true;
@@ -641,7 +641,7 @@ inline void hwtiles::export_composite_layers()
             continue;
 
         const std::filesystem::path filename =
-            std::filesystem::path("background_export") / (key + ".png");
+            std::filesystem::path("texture_export") / (key + ".png");
         if (std::filesystem::exists(filename))
             continue;
 
@@ -714,7 +714,7 @@ inline void hwtiles::export_composite_layers()
         }
 
         const std::filesystem::path manifest_path =
-            std::filesystem::path("background_export") / "manifest.csv";
+            std::filesystem::path("texture_export") / "tilemap_manifest.csv";
         const bool new_manifest =
             !std::filesystem::exists(manifest_path) ||
             std::filesystem::file_size(manifest_path) == 0;

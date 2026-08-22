@@ -30,6 +30,12 @@ public:
 
     // Development exporter for the solid-fill road background (sky).
     void export_background_layer();
+
+    // Replacement wrapper. video.cpp is redirected to this member-pointer by a
+    // development-only macro after all class declarations have been parsed.
+    void render_background_replacement_wrapper(uint16_t*);
+    void (HWRoad::*render_background_with_replacements)(uint16_t*) =
+        &HWRoad::render_background_replacement_wrapper;
   
 private:
     uint8_t road_control;

@@ -25,6 +25,18 @@ namespace texture_replacement_frame
         float u1 = 1.0f;
         float v1 = 1.0f;
         bool repeat = false;
+        bool flip_x = false;
+        bool flip_y = false;
+
+        // Full-frame tile/road commands use exact indexed-pixel ownership.
+        // Sprite commands instead identify their final pixels by System-16
+        // palette base (plus optional shadow-half ownership).
+        bool sprite_palette_ownership = false;
+        uint16_t sprite_palette_base = 0;
+        bool sprite_shadow = false;
+
+        // These arrays are command-local: width * height entries. Full-screen
+        // layer commands simply have x=y=0 and dimensions equal to the frame.
         std::vector<uint16_t> expected_pixels;
         std::vector<uint16_t> restore_pixels;
         std::vector<uint8_t> visibility_mask;

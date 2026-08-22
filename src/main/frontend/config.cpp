@@ -328,10 +328,10 @@ bool Config::save()
         "controls.device_bindings",
         encode_device_bindings(controls.device_bindings));
 
-    // Outside the Music Select / active run flow, changing car_pal is a real
-    // settings change (for example from the Handling menu). Promote it to the
-    // persistent default. During GS_INIT_MUSIC..GS_REINIT it is race-only.
-    if (outrun.game_state < GS_INIT_MUSIC || outrun.game_state > GS_REINIT)
+    // A colour changed in the frontend settings menu is a real default change.
+    // While the engine is running, car_pal is runtime state: Music Select and
+    // the race are never allowed to promote that temporary value implicitly.
+    if (cannonball::state != cannonball::STATE_GAME)
         car_palette_state::set_default(engine.car_pal);
 
     // config_base.cpp persists engine.car_pal as engine.car_color. Temporarily

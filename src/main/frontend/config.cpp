@@ -328,6 +328,12 @@ bool Config::save()
         "controls.device_bindings",
         encode_device_bindings(controls.device_bindings));
 
+    // Outside the Music Select / active run flow, changing car_pal is a real
+    // settings change (for example from the Handling menu). Promote it to the
+    // persistent default. During GS_INIT_MUSIC..GS_REINIT it is race-only.
+    if (outrun.game_state < GS_INIT_MUSIC || outrun.game_state > GS_REINIT)
+        car_palette_state::set_default(engine.car_pal);
+
     // config_base.cpp persists engine.car_pal as engine.car_color. Temporarily
     // substitute the persistent attract/default colour so a Music Select or
     // in-race colour can never leak into config.xml.
